@@ -1,0 +1,5 @@
+#!/bin/bash
+cd /home/vitaliy/home_projects/local-php
+php -S localhost:8181 &
+firefox http://localhost:8181
+code .

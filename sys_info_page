@@ -1,0 +1,45 @@
+#!/bin/bash
+TITLE="System Information Report For $HOSTNAME"; # таким способом можно обьявить константу declare -r TITLE="Page Title"
+CURRENT_TIME=$(date +"%x %r %Z");
+TIME_STAMP="Generated $CURRENT_TIME, by $USER";
+
+function report_uptime () {
+    local result;
+    result="<h2>System Uptime</h2> <pre>$(uptime)</pre>";
+    echo $result;
+    return 0;
+}
+
+function report_disk_space () {
+    local result;
+    result="<h2>Disk Space Utilization</h2><pre>$(df -h)</pre>";
+    echo $result;
+    return 0;
+}
+
+function report_home_space () {
+    local result;
+    if [[ $(id -u) -eq 0 ]];
+    then
+        result="<h2>Home Space Utilization (All Users)</h2><pre>$(du -sh /home/*)</pre>";
+    else
+        result="<h2>Home Space Utilization ($USER)</h2><pre>$(du -sh $HOME)</pre>";
+    fi;
+    echo $result;
+    return 0;
+}
+
+
+echo "
+<html>
+    <head>
+        <title>$TITLE</title>
+    </head>
+    <body>
+        <h1>$TITLE</h1>
+        <p>$TIME_STAMP</p>
+        $(report_uptime)
+        $(report_disk_space)
+        $(report_home_space)
+    </body>
+</html>";

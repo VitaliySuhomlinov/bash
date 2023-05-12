@@ -1,0 +1,328 @@
+#!/bin/bash
+
+#**
+#*Signature
+#*Installing set Linux, Apache, MySQL, PHP (LAMP) in Ubuntu 20.04. PHP will work as Apache module. 
+#*https://www.digitalocean.com/community/tutorials/how-to-install-linux-apache-mysql-php-lamp-stack-on-ubuntu-20-04-ru
+#*Progress-bar http://linuxoid.in/%D0%9F%D1%80%D0%BE%D0%B3%D1%80%D0%B5%D1%81%D1%81-%D0%B1%D0%B0%D1%80_%D0%B4%D0%BB%D1%8F_%D1%81%D0%BA%D1%80%D0%B8%D0%BF%D1%82%D0%BE%D0%B2
+#*Progress-bar v2
+#*phpmyadmin https://losst.pro/ustanovka-phpmyadmin-ubuntu-18-04 
+#**
+
+#**
+#*Global variable
+#**
+SWD=${0%/*};
+DOMEN_NAME="your_domain";
+ROOT_PASSWORD="root555";
+ADMINER_PASSWORD="rokit555";
+
+#**
+#*Start check
+#**
+if [[ $(id -u) -ne 0 ]];
+then
+    echo -e "\n You are not adminer. \n Run the command sudo -i (or sudo bash $0). \n Enter you password for current user. \n And start this script again.\n $0\n";
+    exit 1;
+fi
+
+declare -A check_release;
+check_release["dist_name"]="false";
+check_release["version"]="false";
+
+while read string; do
+    IFS="=" read name value <<< "$string";
+    value=${value//\"/};
+
+    if [[ $name == "NAME" && $value == "Ubuntu" ]]; then
+        check_release["dist_name"]="true";
+    fi
+
+    if [[ $name == "VERSION_ID" && $value == "20.04" ]]; then
+        check_release["version"]="true";
+    fi
+done < /etc/os-release
+
+if [[ "false" == ${check_release["dist_name"]} || "false" == ${check_release["version"]} ]]; then
+    echo -e "The script has not been tested for your distribution and/or its version.\nThe script is designed for Ubuntu 20.04.";
+    exit 1;
+fi
+
+#**
+#*Functions helpers
+#**
+good_print(){
+    if [[ "" == $1 ]]; then
+        echo -e "The function expects a string in the first parameter \n";
+        return 1;
+    fi
+    GREEN="\e[32m";
+    ENDCOLOR="\e[0m";
+    echo -e "${GREEN}$1${ENDCOLOR}";
+    return 0;
+}
+
+bad_print(){
+    if [[ "" == $1 ]]; then
+        echo -e "The function expects a string in the first parameter \n";
+        return 1;
+    fi
+    RED="\e[31m";
+    ENDCOLOR="\e[0m";
+    echo -e "${RED}$1${ENDCOLOR}";
+    return 0;
+}
+
+get_approval(){
+    good_print "Are you ready to continue? yes: Y or y,  no: N or n";
+    read response;
+    if [[ $response == "N" || $response == "n"  ]]; then
+        message="Do you want to interrupt the installation? yes: Y or y,  no: N or n";
+        bad_print "$message";
+        read response;
+        if [[ $response == "Y" || $response == "y"  ]]; then
+            exit 1;
+        fi
+    fi
+    return 0;
+}
+
+#**
+#*Functions actions
+#**
+install_apache(){
+    apt -y update;
+    if [[ 0 != $? ]]; then
+        bad_print "update failed";
+        return 1;
+    fi
+    apt -y install apache2;
+    if [[ 0 != $? ]]; then
+        bad_print "install apach2 failed";
+        return 1;
+    fi
+    good_print "Step one [Install apache2].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+configuration_ufw(){
+    ufw allow in "Apache";
+    ufw allow in "OpenSSH";
+    ufw_status=$(ufw status);
+
+    if [[ $ufw_status != *"Status: active"* ]]; then
+        good_print "To this question (Command may disrupt existing ssh connections. Proceed with operation (y|n)?) you can answer yes (y)";
+        sleep 5;
+        ufw enable;
+    fi
+    ufw status;
+    good_print "Step two [Configuration UFW].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+apache_health_check(){
+    good_print "At this stage you can check the Apache. Make a request from the browser or through curl http://ip_addr:port or http://domain_name:port You should see the start page and the Apache server.";
+    get_approval;
+    good_print "Step third [Apache health check].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_mysql(){
+    apt -y install mysql-server;
+    if [[ 0 != $? ]]; then
+        bad_print "install mysql failed";
+        return 1;
+    fi
+
+    good_print "The database is installed correctly.";
+    good_print "Now you need to enter the preparation for running the security script.";
+    good_print "Enter this command in the Mysql monitor.";
+    good_print "1. ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ROOT_PASSWORD}';";
+    good_print "2. exit;";
+    good_print "Remember to replace the word PASSWORD with your password";
+    get_approval;
+    mysql 2> /dev/null;
+
+    good_print "We’re about to launch a security breach.";
+    good_print "1. Enter the password you set for the root user in the previous step.";
+    good_print "2. Plugin validation of your password is optional. That is the answer - N";
+    good_print "3. If you are satisfied with the previously installed password for the root user, you do not need to change it. That is the answer - N":
+    good_print "4. Anonymous user should be removed. That is the answer - Y";
+    good_print "5. It is recommended to deny remote access. That is, the answer is - Y";
+    good_print "6. The test database is better to delete. That is the answer - Y";
+    good_print "7. It is recommended to reset all starting privileges. That is the answer - Y";
+
+    get_approval;
+    mysql_secure_installation;
+
+    good_print "Next, we need to create a new Mysql user.";
+    good_print "To do this, run the following commands in Mysql Monitor.";
+    good_print "1. CREATE USER 'adminer'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINER_PASSWORD}';";
+    good_print "2. GRANT ALL PRIVILEGES ON *.* TO 'adminer'@'localhost' WITH GRANT OPTION;";
+    good_print "3. exit;"
+    good_print "Don't forget to replace the word password with a password that suits you.";
+    get_approval;
+    mysql -u root -p${ROOT_PASSWORD};
+    good_print "Step four [install Mysql].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_php() {
+    apt -y install php libapache2-mod-php php-mysql;
+    if [[ 0 != $? ]]; then
+        bad_print "install php libapache2-mod-php php-mysql failed";
+        return 1;
+    fi
+
+    apt -y install php-curl php-json php-cgi php-gd php-zip php-mbstring php-xml php-xmlrpc;
+    if [[ 0 != $? ]]; then
+        bad_print "install php-curl php-json php-cgi php-gd php-zip php-mbstring php-xml php-xmlrpc failed";
+        return 1;
+    fi
+    good_print "Step five [install PHP].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+create_virtual_host(){
+    mkdir /var/www/your_domain;
+    touch /etc/apache2/sites-available/your_domain.conf;
+    echo -e '<VirtualHost *:80>
+    ServerName your_domain
+    ServerAlias www.your_domain
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/your_domain
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>' > /etc/apache2/sites-available/your_domain.conf;
+    a2ensite your_domain;
+    a2dissite 000-default;
+    systemctl reload apache2;
+    apache2ctl configtest;
+    sleep 5;
+
+    touch /var/www/your_domain/index.html;
+    echo -e "<h1>It works!</h1>
+    <p>This is the landing page of <strong>your_domain</strong>.</p>" > /var/www/your_domain/index.html;
+    sed -i 's/DirectoryIndex /DirectoryIndex index.php /' /etc/apache2/mods-enabled/dir.conf;
+    systemctl reload apache2;
+    systemctl status apache2;
+    good_print "Step six [Create virtual host].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+test_php() {
+    touch /var/www/your_domain/info.php;
+    echo -e "<?php
+    phpinfo();" > /var/www/your_domain/info.php;
+    good_print "Now you can check if php is working correctly. Query http://your_ip/info.php or http://your_domain/info.php";
+    get_approval;
+    rm /var/www/your_domain/info.php;
+    good_print "Step seven [Test PHP].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+test_php_and_mysql(){
+    good_print "To verify that PHP and Mysql work together, you must do the following.";
+    good_print "Create test data in the database."; 
+    good_print "1. CREATE DATABASE example_database;";
+    good_print "2. SHOW DATABASES;";
+    good_print "3. create TABLE example_database.todo_list (item_id INT AUTO_INCREMENT,content VARCHAR(255),PRIMARY KEY(item_id));";
+    good_print "4. INSERT INTO example_database.todo_list (content) VALUES ( \"My first important item is\");";
+    good_print "5. SELECT * FROM example_database.todo_list;";
+    good_print "6. exit";
+    get_approval;
+    mysql -uadminer -p${ADMINER_PASSWORD};
+
+    touch /var/www/your_domain/todo_list.php;
+    echo -e "<?php
+    \$user = 'adminer';
+    \$password = '${ADMINER_PASSWORD}';
+    \$database = 'example_database';
+    \$table = 'todo_list';" > /var/www/your_domain/todo_list.php;
+
+    echo -e 'try {
+      $db = new PDO("mysql:host=localhost;dbname=$database", $user, $password);
+      echo "<h2>TODO</h2><ol>";
+      foreach($db->query("SELECT content FROM $table") as $row) {
+        echo "<li>" . $row['content'] . "</li>";
+      }
+      echo "</ol>";
+    } catch (PDOException $e) {
+        print "Error!: " . $e->getMessage() . "<br/>";
+        die();
+    }' >> /var/www/your_domain/todo_list.php;
+
+    good_print "Now you can check if php and mysql are working correctly. Query http://your_ip/todo_list.php or http://your_domain/todo_list.php";
+    get_approval;
+    good_print "Step eight [Test PHP and MySQL].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+
+}
+
+install_phpmyadmin(){
+    apt -y install php-mbstring;
+
+    good_print "The installation of phpmyadmin will now be started";
+    good_print "During the installation process, you will need to answer a few questions.";
+    good_print "Here's a list of clues:";
+    good_print "1. Use the Spacebar to select apache2, and then use Tab and Enter to press the OK button";
+    good_print "2. Next, the installer will prompt to create a database for phpMyAdmin, which will contain the official information of the program and the necessary settings, you must agree to choose Yes:";
+    good_print "Enter the password for the user phpmyadmin. You can use the same password as the adminer user.  Or any other password.";
+    get_approval;
+    apt -y install phpmyadmin;
+    good_print "At this point, phpmyadmin is already available at http://your_ip/phpmyadmin or http://your_domain/phpmyadmin";
+    get_approval;
+
+    touch /usr/share/phpmyadmin/.htaccess;
+    echo -e 'AuthType Basic
+    AuthName "Restricted Files"
+    AuthUserFile /etc/phpmyadmin/.htpasswd
+    Require valid-user' > /usr/share/phpmyadmin/.htaccess;
+
+    htpasswd -c /etc/phpmyadmin/.htpasswd adminer;
+    echo -e "<Directory /usr/share>
+    AllowOverride All
+    Require all granted
+    </Directory>" >> /etc/apache2/apache2.conf;
+    systemctl restart apache2;
+    good_print "Step nine [Install_phpmyqdmin].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+#**
+#*RUN
+#**
+install_apache;
+configuration_ufw;
+apache_health_check;
+install_mysql;
+install_php;
+create_virtual_host;
+test_php;
+test_php_and_mysql;
+install_phpmyadmin;
+
+
+echo "
+           ▄▄▄▄
+           █░░█'
+           █░░█
+           █░░░█
+         █░░░░ █
+███████▄▄█░░░░░██████▄
+▓▓▓▓▓▓█░░░░░░░░░░░░░░█
+▓▓▓▓▓▓█░░░░░░░░░░░░░░░█
+▓▓▓▓▓▓█scriptcraft ░░░█
+▓▓▓▓▓▓█░░░░░░░░░░░░░░█
+▓▓▓▓▓▓█░░░░░░░░░░░░░░█
+▓▓▓▓▓▓█████░░░░░░░░░█
+██████▀░░░░▀▀█████▀ ";

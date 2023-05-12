@@ -1,0 +1,24 @@
+#!/bin/bash
+status=$(ps -aux | grep lamp | grep -v 'grep' | grep -v '/home/vitaliy/bin/lamp');
+
+if [[ "$status" ]];
+then
+    echo -n "Server status: UP. You wont stop server Y or N -> ";
+    read answer;
+    if [[ "y" == "$answer" || "Y" == "$answer" ]];
+    then
+        sudo /opt/lampp/lampp stop;
+        echo "Server was stoped";
+        exit 0;
+    elif [[ "n" == "$answer" || "N" == "$answer" ]];
+    then
+        echo "Server will continue to work";
+        exit 1;
+    else
+        echo "Program breakdown. Only the characters y/Y or n/N are accepted.";
+   fi         
+else
+    sudo /opt/lampp/lampp start;
+    exit 0;
+fi
+

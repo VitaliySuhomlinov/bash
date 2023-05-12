@@ -1,0 +1,125 @@
+#!/bin/bash
+
+#**
+#*Global variable
+#**
+SWD=${0%/*};
+
+
+#**
+#*Start check
+#**
+if [[ $(id -u) -ne 0 ]]; 
+then
+    echo -e "\n You are not adminer. \n Run the command sudo -i. \n Enter you password for current user. \n And start this script again.\n $0\n";
+    exit 1;
+fi
+
+declare -A check_release;
+check_release["dist_name"]="false";
+check_release["version"]="false";
+
+while read string; do
+    IFS="=" read name value <<< "$string";
+    value=${value//\"/};
+
+    if [[ $name == "NAME" && $value == "Ubuntu" ]]; then
+        check_release["dist_name"]="true";
+    fi
+
+    if [[ $name == "VERSION_ID" && $value == "20.04" ]]; then
+        check_release["version"]="true";
+    fi
+done < /etc/os-release
+
+if [[ "false" == ${check_release["dist_name"]} || "false" == ${check_release["version"]} ]]; then
+    echo -e "The script has not been tested for your distribution and/or its version.\nThe script is designed for Ubuntu 20.04.";
+    exit 1;
+fi
+
+#**
+#*Server
+#**
+apt update -y;
+apt install dpkg-dev build-essential gnupg2 git gcc cmake libpcre3 libpcre3-dev zlib1g zlib1g-dev openssl libssl-dev curl unzip -y;
+curl -L https://nginx.org/keys/nginx_signing.key | apt-key add -;
+touch /etc/apt/sources.list.d/nginx.list;
+echo "deb http://nginx.org/packages/ubuntu/ focal nginx" > /etc/apt/sources.list.d/nginx.list;
+echo "deb-src http://nginx.org/packages/ubuntu/ focal nginx" >> /etc/apt/sources.list.d/nginx.list;
+apt update -y;
+cd /usr/local/src;
+apt source nginx;
+apt build-dep nginx -y;
+git clone --recursive https://github.com/google/ngx_brotli.git;
+cd /usr/local/src/nginx-*/;
+rules="./debian/rules";
+sed -i 's/CFLAGS="" .\/configure/CFLAGS="" .\/configure --add-module=\/usr\/local\/src\/ngx_brotli /' $rules;
+dpkg-buildpackage -b -uc -us;
+dpkg -i /usr/local/src/*.deb;
+cat "$SWD/nginx_conf" > /etc/nginx/nginx.conf;
+nginx -t;
+systemctl start nginx;
+#Фиксит ошибку с PID
+mkdir /etc/systemd/system/nginx.service.d;
+printf "[Service]\nExecStartPost=/bin/sleep 0.1\n" > /etc/systemd/system/nginx.service.d/override.conf;
+systemctl daemon-reload;
+systemctl restart nginx;
+#Проверяет Brotli
+curl -H 'Accept-Encoding: br' -I http://localhost;
+#Устанавливает файрвол
+apt-get install ufw;
+#Добавляет nginx в список приложений доступных к этому фаерволу
+cat "$SWD/ufw_config" > /etc/ufw/applications.d/nginx.ini;
+#Проверяет список приложений
+ufw app list;
+#Включает файрвол
+ufw enable;
+#Command may disrupt existing ssh connections. Proceed with operation (y|n)? Ответить - да. Пока не знаю как это автоматизированть. 
+#Разрешает сервисы
+ufw allow 'Nginx Full';
+ufw allow 'OpenSSH';
+#Проверяем статус 
+ufw status;
+
+#**
+#*Сайт
+#**
+#Создаёт папку для сайта
+mkdir -p /var/www/evgeniy.com/html;
+touch /var/www/evgeniy.com/html/index.html;
+cat "$SWD/index" > /var/www/evgeniy.com/html/index.html;
+#Создаем файлы для конфига
+mkdir -p /etc/nginx/sites-available/;
+mkdir -p /etc/nginx/sites-enabled/;
+touch /etc/nginx/sites-available/evgeniy.com.conf;
+cat "$SWD/evgeniy.com.conf" > /etc/nginx/sites-available/evgeniy.com.conf;
+nginx -t;
+#Включает конфиг
+ln -s /etc/nginx/sites-available/evgeniy.com.conf /etc/nginx/sites-enabled/;
+nginx -t;
+#Рестартует nginx
+systemctl restart nginx;
+sed -i -e '1 s/^/127.0.0.1 evgeniy.com\n/;' /etc/hosts;
+curl example.com;
+
+#**
+#*Сертификат
+#**
+#Генерирует ключ
+openssl dhparam -out /etc/ssl/certs/dhparam.pem 2048;
+#Создаёт папку для снипетов
+mkdir -p /etc/nginx/snippets/;
+#Создаёт снипет для SSL
+touch /etc/nginx/snippets/ssl-params.conf;
+cat "$SWD/ssl-params.conf" > /etc/nginx/snippets/ssl-params.conf;
+#Обновляет snapd
+snap install core;
+#Устанавливает certbot
+snap install --classic certbot;
+#Проверка certbot
+ln -s /snap/bin/certbot /usr/bin/certbot;
+#Выпускает сертификат
+certbot certonly --nginx;
+#Меняет конфиг сайта
+cat "$SWD/evgeniy.com.conf.v2" > /etc/nginx/sites-available/evgeniy.com.conf;
+
