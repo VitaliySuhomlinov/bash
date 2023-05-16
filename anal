@@ -1,6 +1,0 @@
-#!/bin/bash
-bugs=$(cat data)
-for i in $bugs; do
-    mv $i /home/admin/www/hlam 
-done
-
