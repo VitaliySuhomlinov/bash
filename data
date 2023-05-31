@@ -1,6 +1,8 @@
-dron
-bulka
-abadon
-city
-
-
+        <VirtualHost *:80>
+            ServerName 
+            ServerAlias www.
+            ServerAdmin webmaster@localhost
+            DocumentRoot /var/www/
+            ErrorLog ${APACHE_LOG_DIR}/error.log
+            CustomLog ${APACHE_LOG_DIR}/access.log combined
+        </VirtualHost>
