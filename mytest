@@ -1,10 +1,3 @@
 #!/bin/bash
-if [ -n "$1" ]
-# Проверка наличия аргумента командной строки.
-then
-  lines=$1
-else
-  lines=$LINES # Значение по-умолчанию, если число не задано в командной строке
-fi
-echo $lines
-echo Number_of_expected_args
+q="dsvksdkjv"
+echo "dbvsdvsdbv+${q}"
