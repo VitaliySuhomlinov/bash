@@ -1,3 +1,6 @@
 #!/bin/bash
-q="dsvksdkjv"
-echo "dbvsdvsdbv+${q}"
+#sed -i 's/"include \/etc\/nginx\/sites-enabled\/*;" /"include \/etc\/nginx\/sites-enabled\/*.conf;" /' data;   
+sed -i 's/include \/etc\/nginx\/sites-enabled\/\*/include \/etc\/nginx\/sites-enabled\/*.conf/' ./data; 
+
+
+#sed -i 's/DirectoryIndex/DirectoryIndex index.php /' data;

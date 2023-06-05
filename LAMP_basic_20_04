@@ -46,7 +46,7 @@ while read string; do
         check_release["dist_name"]="true";
     fi
 
-    if [[ $name == "VERSION_ID" && $value == "22.04" ]]; then
+    if [[ $name == "VERSION_ID" && $value == "20.04" ]]; then
         check_release["version"]="true";
     fi
 done < /etc/os-release
@@ -101,9 +101,7 @@ get_approval(){
 install_apache(){
     good_print "***INSTALL APACHE2***";
     sleep 3;
-    sed -i "/#\$nrconf{restart} = 'i';/s/.*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf
     apt-get -y update;
-    apt-get -y upgrade;
     if [[ 0 != $? ]]; then
         bad_print "update failed";
         return 1;
