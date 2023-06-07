@@ -6,6 +6,7 @@
 #*Redirect https://eternalhost.net/base/vps-vds/nginx-redirekt
 #*Phpmyadmin https://losst.pro/ustanovka-phpmyadmin-s-nginx-v-ubuntu-20-04 OR 
 #*https://www.digitalocean.com/community/tutorials/how-to-install-and-secure-phpmyadmin-with-nginx-on-an-ubuntu-20-04-server
+#* Settings phpmyadmin - https://php-myadmin.ru/doc/config/
 #**
 
 #**
@@ -23,6 +24,7 @@ AUTH_PASS_PMA="rokit555!!!";
 INSTALL_SSL="yes";
 ADMIN_EMAIL="scriptcraft.site@gmail.com";
 IP=$(wget -qO- ifconfig.me);
+HIDDEN_URI_PMA=$(head -c 100 /dev/urandom | base64 | sed 's/[+=/A-Z]//g' | tail -c 9);
 
 #**
 #*Start check
@@ -213,12 +215,21 @@ install_php(){
 create_main_domain(){
     good_print "***CREATE MAIN DOMAIN***";
     sleep 3;
+
+    files=$(ls /var/run/php/);
+    for file in $files; do
+        type=$(file /var/run/php/$file);
+        type=${type#*: };
+        if [[ "socket" == $type ]]; then
+            php_fpm_sock=$file;
+        fi
+    done
+
     mkdir "/var/www/${MAIN_DOMAIN}";
     touch "/etc/nginx/sites-available/${MAIN_DOMAIN}.conf";
     cat << EOF > "/etc/nginx/sites-available/${MAIN_DOMAIN}.conf"
 server {
     listen 80;
-    #listen [::]:80 default_server;
 
     root /var/www/${MAIN_DOMAIN};
 
@@ -227,22 +238,31 @@ server {
     server_name ${MAIN_DOMAIN};
 
     location / {
-            try_files $uri $uri/ =404;
+            try_files \$uri \$uri/ =404;
     }
 
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_pass unix:/var/run/php/${php_fpm_sock};
     }
 
     location ~ /\.ht {
         deny all;
     }
 
+    location ^~ /${HIDDEN_URI_PMA}/ {
+        auth_basic "Admin Login";
+        auth_basic_user_file /etc/nginx/pma_pass;
+
+        location ~ \.php$ {
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass unix:/var/run/php/${php_fpm_sock};
+        }
+    }
+
 }
-
-
 EOF
+
     ln -s /etc/nginx/sites-available/${MAIN_DOMAIN}.conf /etc/nginx/sites-enabled/;
     unlink /etc/nginx/sites-enabled/default;
     systemctl reload nginx;
@@ -251,7 +271,7 @@ EOF
 
     sed -i 's/include \/etc\/nginx\/sites-enabled\/\*/include \/etc\/nginx\/sites-enabled\/*.conf/' /etc/nginx/nginx.conf;  
     systemctl reload nginx;
-    good_print "Step 4 [Create main domain].\nStatus: normal.\n";
+    good_print "Step 6 [Create main domain].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -274,7 +294,6 @@ create_sub_domain(){
         cat << EOF > "/etc/nginx/sites-available/${subdomain}.conf"
 server {
     listen 80;
-    #listen [::]:80 default_server;
 
     root /var/www/${subdomain};
 
@@ -283,12 +302,12 @@ server {
     server_name ${subdomain};
 
     location / {
-            try_files $uri $uri/ =404;
+            try_files \$uri \$uri/ =404;
     }
 
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_pass unix:/var/run/php/${php_fpm_sock};
     }
 
     location ~ /\.ht {
@@ -309,14 +328,6 @@ EOF
     return 0;
 }
 
-redirect_from_ip_to_main_domain(){
-    good_print "***REDIRECT FROM IP TO MAIN DOMAIN***";
-    sleep 3;
-    good_print "Step 8 [Redirect from ip to main domain].\nStatus: normal.\n";
-    sleep 5;
-    return 0;
-}
-
 test_php(){
     good_print "***TEST PHP***";
     sleep 3;
@@ -328,7 +339,7 @@ EOF
     good_print "Now you can check if php is working correctly. Query http://your_ip/info.php or http://$MAIN_DOMAIN/info.php";
     get_approval;
     rm "/var/www/$MAIN_DOMAIN/info.php";
-    good_print "Step 9 [Test PHP].\nStatus: normal.\n";
+    good_print "Step 8 [Test PHP].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -369,10 +380,19 @@ test_php_and_mysql(){
     good_print "Now you can check if php and mysql are working correctly. Query http://your_ip/todo_list.php or http://$MAIN_DOMAIN/todo_list.php";
     get_approval;
     rm "/var/www/$MAIN_DOMAIN/todo_list.php";
-    good_print "Step 10 [Test PHP and MySQL].\nStatus: normal.\n";
+    good_print "Step 9 [Test PHP and MySQL].\nStatus: normal.\n";
     sleep 5;
     return 0;
 
+}
+
+
+redirect_from_ip_to_main_domain(){
+    good_print "***REDIRECT FROM IP TO MAIN DOMAIN***";
+    sleep 3;
+    good_print "Step 10 [Redirect from ip to main domain].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
 }
 
 install_phpmyadmin(){
@@ -387,13 +407,14 @@ install_phpmyadmin(){
     good_print "Enter the password for the user phpmyadmin. You can use the same password as the adminer user.  Or any other password.";
     get_approval;
     apt -y install phpmyadmin;
+    ln -s /usr/share/phpmyadmin /var/www/${MAIN_DOMAIN}/phpmyadmin;
     good_print "At this point, phpmyadmin is already available at http://your_ip/phpmyadmin or http://$MAIN_DOMAIN/phpmyadmin";
     get_approval;
 
-    ln -s /usr/share/phpmyadmin /var/www/${MAIN_DOMAIN}/phpmyadmin;
-    random_string=$(head -c 100 /dev/urandom | base64 | sed 's/[+=/A-Z]//g' | tail -c 9);
-    mv /var/www/${MAIN_DOMAIN}/phpmyadmin /var/www/${MAIN_DOMAIN}/$random_string;
-    echo "PHPMYADMIN - http://$MAIN_DOMAIN/${random_string}" >> /home/$USER/LEMP_basic_22_04_report
+    
+    mv /var/www/${MAIN_DOMAIN}/phpmyadmin /var/www/${MAIN_DOMAIN}/${HIDDEN_URI_PMA};
+    touch /tmp/LEMP_basic_22_04_report;
+    echo "PHPMYADMIN - http://${MAIN_DOMAIN}/${HIDDEN_URI_PMA}" >> /tmp/LEMP_basic_22_04_report;
 
     touch "/etc/phpmyadmin/conf.d/pma_secure.php";
     cat << EOF > "/etc/phpmyadmin/conf.d/pma_secure.php"
@@ -401,14 +422,14 @@ install_phpmyadmin(){
 
 # PhpMyAdmin Settings
 # This should be set to a random string of at least 32 chars
-$cfg['blowfish_secret'] = 'ra8pi36bl9yk0y2xn0py45sngg3x156k';
+\$cfg['blowfish_secret'] = 'ra8pi36bl9yk0y2xn0py45sngg3x156k';
 
-$i=0;
-$i++;
+\$i=0;
+\$i++;
 
-$cfg['Servers'][$i]['auth_type'] = 'cookie';
-$cfg['Servers'][$i]['AllowNoPassword'] = false;
-$cfg['Servers'][$i]['AllowRoot'] = false;
+\$cfg['Servers'][$i]['auth_type'] = 'cookie';
+\$cfg['Servers'][$i]['AllowNoPassword'] = false;
+\$cfg['Servers'][$i]['AllowRoot'] = false;
 
 ?>
 EOF
@@ -416,8 +437,9 @@ EOF
     crypt=$(openssl passwd $AUTH_PASS_PMA);
     touch "/etc/nginx/pma_pass";
     cat << EOF > "/etc/nginx/pma_pass"
-$AUTH_PASS_PMA:$crypt
+adminer:$crypt
 EOF
+    systemctl reload nginx;
     good_print "Step 11 [Install_phpmyqdmin].\nStatus: normal.\n";
     sleep 5;
     return 0;
@@ -463,6 +485,7 @@ install_wordpress_for_sub_domain(){
     good_print "Step 13 [Install wordpress for sub domain].\nStatus: normal.\n";
     sleep 5;
     return 0;
+    #https://www.youtube.com/watch?v=VF3VvP9v0Y8
 }
 
 delete_unnecessary(){
@@ -504,11 +527,10 @@ create_sub_domain;
 redirect_from_ip_to_main_domain;
 test_php;
 test_php_and_mysql;
-#install_phpmyadmin;
+install_phpmyadmin;
 install_wordpress_for_main_domain;
 install_wordpress_for_sub_domain;
 delete_unnecessary;
-
 
 echo "
            ▄▄▄▄
