@@ -13,10 +13,10 @@
 #*Global variable
 #**
 SWD=${0%/*};
-MAIN_DOMAIN="scriptcraft.site";
+MAIN_DOMAIN="scriptcraft.fun";
 SUBDOMAINS=(
-    "dev.scriptcraft.site" 
-    "stg.scriptcraft.site"
+    "dev.scriptcraft.fun" 
+    "stg.scriptcraft.fun"
     );
 ROOT_PASSWORD="root555";
 ADMINER_PASSWORD="rokit555";
@@ -99,11 +99,22 @@ get_approval(){
 #**
 #*Functions actions
 #**
-install_nginx(){
-    good_print "***INSTALL NGINX***";
+zero_step(){
+    good_print "***ZERO STEP***";
     sleep 3;
     sed -i "/#\$nrconf{restart} = 'i';/s/.*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf;
     apt-get -y update;
+    apt-get -y upgrade;
+    apt-get -y install -y vim mosh tmux htop git curl wget unzip zip gcc build-essential make;
+    good_print "Step 0 [Zero step].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_nginx(){
+    good_print "***INSTALL NGINX***";
+    sleep 3;
+    
     if [[ 0 != $? ]]; then
         bad_print "update failed";
         return 1;
@@ -196,7 +207,7 @@ install_mysql(){
 install_php(){
     good_print "***INSTALL PHP***";
     sleep 3;
-    apt -y install php8.1-fpm php-mysql;
+    apt -y install php-fpm php-mysql;
     if [[ 0 != $? ]]; then
         bad_print "install php libapache2-mod-php php-mysql failed";
         return 1;
@@ -236,6 +247,9 @@ server {
     index index.php index.html;
 
     server_name ${MAIN_DOMAIN};
+
+    error_log /var/log/nginx/${MAIN_DOMAIN}.error.log;
+    access_log /var/log/nginx/${MAIN_DOMAIN}.access.log;
 
     location / {
             try_files \$uri \$uri/ =404;
@@ -300,6 +314,9 @@ server {
     index index.php index.html;
 
     server_name ${subdomain};
+
+    error_log /var/log/nginx/${subdomain}.error.log;
+    access_log /var/log/nginx/${subdomain}.access.log;
 
     location / {
             try_files \$uri \$uri/ =404;
@@ -517,6 +534,7 @@ delete_unnecessary(){
 #**
 #*RUN
 #**
+zero_step;
 install_nginx;
 configuration_ufw;
 nginx_health_check;
@@ -534,7 +552,7 @@ delete_unnecessary;
 
 echo "
            ▄▄▄▄
-           █░░█'
+           █░░█
            █░░█
            █░░░█
          █░░░░░█

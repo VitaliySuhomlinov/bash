@@ -15,10 +15,10 @@
 #*Global variable
 #**
 SWD=${0%/*};
-MAIN_DOMAIN="scriptcraft.site";
+MAIN_DOMAIN="scriptcraft.fun";
 SUBDOMAINS=(
-    "dev.scriptcraft.site" 
-    "stg.scriptcraft.site"
+    "dev.scriptcraft.fun" 
+    "stg.scriptcraft.fun"
     );
 ROOT_PASSWORD="root555";
 ADMINER_PASSWORD="rokit555";

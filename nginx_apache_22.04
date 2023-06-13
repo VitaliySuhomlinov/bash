@@ -2,7 +2,7 @@
 
 #**
 #*Signature
-#*https://alto.codes/blog/dev/nastraivaem-web-server-nginx-and-apache.html
+#*https://www.youtube.com/watch?v=0SkZSE4yi18&t=1773s
 #**
 
 #**
@@ -100,11 +100,12 @@ install_nginx(){
     sleep 3;
     sed -i "/#\$nrconf{restart} = 'i';/s/.*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf;
     apt-get -y update;
+    apt-get -y upgrade;
     if [[ 0 != $? ]]; then
         bad_print "update failed";
         return 1;
     fi
-    apt -y install nginx;
+    apt-get -y install nginx;
     if [[ 0 != $? ]]; then
         bad_print "install nginx failed";
         return 1;
@@ -119,12 +120,15 @@ install_nginx(){
 install_apache(){
     good_print "***INSTALL APACHE2***";
     sleep 3;
-    apt -y install apache2;
+    apt-get -y install apache2;
     if [[ 0 != $? ]]; then
         bad_print "install apach2 failed";
         return 1;
     fi
+    a2enmod proxy_fcgi setenvif;
+    a2enconf php*.*-fpm;
     systemctl enable apache2;
+    systemctl restart apache2;
     systemctl stop apache2;
     good_print "Step 2 [Install apache2].\nStatus: normal.\n";
     sleep 5;
@@ -209,13 +213,13 @@ install_mysql(){
 install_php(){
     good_print "***INSTALL PHP***";
     sleep 3;
-    apt -y install php libapache2-mod-php php-mysql;
+    apt-get -y install php-fpm php-mysql;
     if [[ 0 != $? ]]; then
         bad_print "install php libapache2-mod-php php-mysql failed";
         return 1;
     fi
 
-    apt -y install php-curl php-json php-cgi php-gd php-zip php-mbstring php-xml php-xmlrpc;
+    apt-get -y install php-curl php-json php-cgi php-gd php-zip php-mbstring php-xml php-xmlrpc;
     if [[ 0 != $? ]]; then
         bad_print "install php-curl php-json php-cgi php-gd php-zip php-mbstring php-xml php-xmlrpc failed";
         return 1;
@@ -268,8 +272,8 @@ server {
 
     server_name ${MAIN_DOMAIN};
 
-    error_log /var/log/nginx/${MAIN_DOMAIN}.error.log
-    access_log /var/log/nginx/${MAIN_DOMAIN}.access.log
+    error_log /var/log/nginx/${MAIN_DOMAIN}.error.log;
+    access_log /var/log/nginx/${MAIN_DOMAIN}.access.log;
 
     location ~* ^.+\.(jpg|jpeg|gif|png|ico|zip|gz|rar|bz2|xls|html|exe|pdf|txt|wav|bmp|js|swf|css|xml)$ {
         root /var/www/${MAIN_DOMAIN};
@@ -278,6 +282,15 @@ server {
 
 }
 EOF
+
+    files=$(ls /var/run/php/);
+    for file in $files; do
+        type=$(file /var/run/php/$file);
+        type=${type#*: };
+        if [[ "socket" == $type ]]; then
+            php_fpm_sock=$file;
+        fi
+    done
 
 cat << EOF > "/etc/apache2/sites-available/$MAIN_DOMAIN.conf"
 <VirtualHost *:81>
@@ -288,10 +301,17 @@ cat << EOF > "/etc/apache2/sites-available/$MAIN_DOMAIN.conf"
     ErrorLog \${APACHE_LOG_DIR}/${MAIN_DOMAIN}_error.log
     CustomLog \${APACHE_LOG_DIR}/${MAIN_DOMAIN}_access.log combined
 
-<Directory /var/www/$MAIN_DOMAIN>
-    Require all granted
-    AllowOverride All
-</Directory>
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/var/run/php/${php_fpm_sock}|fcgi://localhost/"
+
+        # Else we can just use a tcp socket:
+        #SetHandler "proxy:fcgi://127.0.0.1:9000"
+    </FilesMatch>
+
+    <Directory /var/www/$MAIN_DOMAIN>
+        Require all granted
+        AllowOverride All
+    </Directory>
 
 </VirtualHost>
 EOF
@@ -323,6 +343,15 @@ create_sub_domain(){
         fi    
     fi
 
+    files=$(ls /var/run/php/);
+    for file in $files; do
+        type=$(file /var/run/php/$file);
+        type=${type#*: };
+        if [[ "socket" == $type ]]; then
+            php_fpm_sock=$file;
+        fi
+    done
+
     for subdomain in ${SUBDOMAINS[*]}; do 
         mkdir "/var/www/$subdomain";
         touch "/etc/apache2/sites-available/$subdomain.conf";
@@ -335,10 +364,17 @@ create_sub_domain(){
     ErrorLog \${APACHE_LOG_DIR}/${subdomain}_error.log
     CustomLog \${APACHE_LOG_DIR}/${subdomain}_access.log combined
 
-<Directory /var/www/$subdomain>
-    Require all granted
-    AllowOverride All
-</Directory>
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/var/run/php/${php_fpm_sock}|fcgi://localhost/"
+
+        # Else we can just use a tcp socket:
+        #SetHandler "proxy:fcgi://127.0.0.1:9000"
+    </FilesMatch>
+
+    <Directory /var/www/$subdomain>
+        Require all granted
+        AllowOverride All
+    </Directory>
 
 </VirtualHost>
 EOF
@@ -359,8 +395,8 @@ server {
 
     server_name ${subdomain};
 
-    error_log /var/log/nginx/${subdomain}.error.log
-    access_log /var/log/nginx/${subdomain}.access.log
+    error_log /var/log/nginx/${subdomain}.error.log;
+    access_log /var/log/nginx/${subdomain}.access.log;
 
     location ~* ^.+\.(jpg|jpeg|gif|png|ico|zip|gz|rar|bz2|xls|html|exe|pdf|txt|wav|bmp|js|swf|css|xml)$ {
         root /var/www/${subdomain};
@@ -388,7 +424,177 @@ port_installation_for_apache(){
     good_print "***PORT INSTALLATION FOR APACHE***";
     sleep 3;
     sed -i 's/Listen 80/Listen 127.0.0.1:81/' /etc/apache2/ports.conf;
-    good_print "Step 9 [Port installation for apache].\nStatus: normal.\n";
+    systemctl restart apache2;
+    systemctl start apache2;
+    good_print "Step 10 [Port installation for apache].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+test_php(){
+    good_print "***TEST PHP***";
+    sleep 3;
+    touch "/var/www/$MAIN_DOMAIN/info.php";
+    cat << EOF > "/var/www/$MAIN_DOMAIN/info.php"
+<?php
+phpinfo();
+EOF
+    good_print "Now you can check if php is working correctly. Query http://your_ip/info.php or http://$MAIN_DOMAIN/info.php";
+    get_approval;
+    rm "/var/www/$MAIN_DOMAIN/info.php";
+    good_print "Step 8 [Test PHP].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+test_php_and_mysql(){
+    good_print "***TEST PHP AND MYSQL***";
+    sleep 3;
+    good_print "To verify that PHP and Mysql work together, you must do the following.";
+    good_print "Create test data in the database."; 
+    good_print "1. CREATE DATABASE example_database;";
+    good_print "2. SHOW DATABASES;";
+    good_print "3. create TABLE example_database.todo_list (item_id INT AUTO_INCREMENT,content VARCHAR(255),PRIMARY KEY(item_id));";
+    good_print "4. INSERT INTO example_database.todo_list (content) VALUES ( \"My first important item is\");";
+    good_print "5. SELECT * FROM example_database.todo_list;";
+    good_print "6. exit";
+    get_approval;
+    mysql -uadminer -p${ADMINER_PASSWORD};
+
+    touch "/var/www/$MAIN_DOMAIN/todo_list.php";
+    echo -e "<?php
+    \$user = 'adminer';
+    \$password = '${ADMINER_PASSWORD}';
+    \$database = 'example_database';
+    \$table = 'todo_list';" > "/var/www/$MAIN_DOMAIN/todo_list.php";
+
+    echo -e 'try {
+      $db = new PDO("mysql:host=localhost;dbname=$database", $user, $password);
+      echo "<h2>TODO</h2><ol>";
+      foreach($db->query("SELECT content FROM $table") as $row) {
+        echo "<li>" . $row["content"] . "</li>";
+      }
+      echo "</ol>";
+    } catch (PDOException $e) {
+        print "Error!: " . $e->getMessage() . "<br/>";
+        die();
+    }' >> "/var/www/$MAIN_DOMAIN/todo_list.php";
+
+    good_print "Now you can check if php and mysql are working correctly. Query http://your_ip/todo_list.php or http://$MAIN_DOMAIN/todo_list.php";
+    get_approval;
+    rm "/var/www/$MAIN_DOMAIN/todo_list.php";
+    good_print "Step 9 [Test PHP and MySQL].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+
+}
+
+redirect_from_ip_to_main_domain(){
+    good_print "***REDIRECT FROM IP TO MAIN DOMAIN***";
+    sleep 3;
+    good_print "Step 10 [Redirect from ip to main domain].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_phpmyadmin(){
+    good_print "***INSTALL PHPMYADMIN***";
+    sleep 3;
+
+    good_print "The installation of phpmyadmin will now be started";
+    good_print "During the installation process, you will need to answer a few questions.";
+    good_print "Here's a list of clues:";
+    good_print "1. the system will ask you for which server to configure phpmyadmin. Just press Tab (without selecting either apache or lighttpd) and then OK.";
+    good_print "2. Next, the installer will prompt to create a database for phpMyAdmin, which will contain the official information of the program and the necessary settings, you must agree to choose Yes:";
+    good_print "Enter the password for the user phpmyadmin. You can use the same password as the adminer user.  Or any other password.";
+    get_approval;
+    apt -y install phpmyadmin;
+    ln -s /usr/share/phpmyadmin /var/www/${MAIN_DOMAIN}/phpmyadmin;
+    good_print "At this point, phpmyadmin is already available at http://your_ip/phpmyadmin or http://$MAIN_DOMAIN/phpmyadmin";
+    get_approval;
+
+    
+    mv /var/www/${MAIN_DOMAIN}/phpmyadmin /var/www/${MAIN_DOMAIN}/${HIDDEN_URI_PMA};
+    touch /tmp/LEMP_basic_22_04_report;
+    echo "PHPMYADMIN - http://${MAIN_DOMAIN}/${HIDDEN_URI_PMA}" >> /tmp/LEMP_basic_22_04_report;
+
+    touch "/etc/phpmyadmin/conf.d/pma_secure.php";
+    cat << EOF > "/etc/phpmyadmin/conf.d/pma_secure.php"
+<?php
+
+# PhpMyAdmin Settings
+# This should be set to a random string of at least 32 chars
+\$cfg['blowfish_secret'] = 'ra8pi36bl9yk0y2xn0py45sngg3x156k';
+
+\$i=0;
+\$i++;
+
+\$cfg['Servers'][$i]['auth_type'] = 'cookie';
+\$cfg['Servers'][$i]['AllowNoPassword'] = false;
+\$cfg['Servers'][$i]['AllowRoot'] = false;
+
+?>
+EOF
+
+    crypt=$(openssl passwd $AUTH_PASS_PMA);
+    touch "/etc/nginx/pma_pass";
+    cat << EOF > "/etc/nginx/pma_pass"
+adminer:$crypt
+EOF
+    systemctl reload nginx;
+    good_print "Step 11 [Install_phpmyqdmin].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_wordpress_for_main_domain(){
+    good_print "***INSTALL WORDPRESS FOR MAIN DOMAIN***";
+    sleep 3;
+    wget -P "/var/www/$MAIN_DOMAIN/" "https://wordpress.org/latest.zip";
+    apt -y install unzip;
+    unzip /var/www/$MAIN_DOMAIN/latest.zip -d /var/www/$MAIN_DOMAIN/;
+    rm "/var/www/$MAIN_DOMAIN/latest.zip";
+    mv /var/www/$MAIN_DOMAIN/wordpress/* /var/www/$MAIN_DOMAIN/;
+    rm -rf "/var/www/$MAIN_DOMAIN/wordpress/";
+    chown -R "root:www-data" "/var/www/";
+    chmod -R "g+w" "/var/www/";
+    good_print "Step 12 [Install wordpress for main domain].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_wordpress_for_sub_domain(){
+    if [ -z ${SUBDOMAINS} ]; then
+        return 1;
+    else
+        if [[ 0 < ${#SUBDOMAINS[@]} ]]; then 
+            good_print "***INSTALL WORDPRESS FOR SUB DOMAIN***";
+            sleep 3;
+        else
+            return 1;    
+        fi    
+    fi
+
+    for subdomain in ${SUBDOMAINS[*]}; do
+        wget -P "/var/www/$subdomain/" "https://wordpress.org/latest.zip";
+        unzip /var/www/$subdomain/latest.zip -d /var/www/$subdomain/;
+        rm "/var/www/$subdomain/latest.zip";
+        mv /var/www/$subdomain/wordpress/* /var/www/$subdomain/;
+        rm -rf "/var/www/$subdomain/wordpress/";
+        chown -R "root:www-data" "/var/www/";
+        chmod -R "g+w" "/var/www/";
+    done
+    good_print "Step 13 [Install wordpress for sub domain].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+    #https://www.youtube.com/watch?v=VF3VvP9v0Y8
+}
+
+delete_unnecessary(){
+    good_print "***DELETE UNNECESSARY***";
+    sleep 3;
+    rm -rf "/var/www/html";
+    good_print "Step 14 [Delete unnecessary].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -396,21 +602,27 @@ port_installation_for_apache(){
 #**
 #*RUN
 #**
-install_nginx
-install_apache
-configuration_ufw
-nginx_health_check
-install_mysql
-install_php
-create_proxymodule
-create_main_domain
-create_sub_domain
-port_installation_for_apache
-
+install_nginx;
+install_apache;
+configuration_ufw;
+nginx_health_check;
+install_mysql;
+install_php;
+create_proxymodule;
+create_main_domain;
+create_sub_domain;
+port_installation_for_apache;
+test_php;
+test_php_and_mysql;
+redirect_from_ip_to_main_domain;
+install_phpmyadmin;
+install_wordpress_for_main_domain;
+install_wordpress_for_sub_domain;
+delete_unnecessary;
 
 echo "
            ▄▄▄▄
-           █░░█'
+           █░░█
            █░░█
            █░░░█
          █░░░░░█
