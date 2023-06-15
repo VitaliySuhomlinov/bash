@@ -95,16 +95,22 @@ get_approval(){
 #**
 #*Functions actions
 #**
-install_nginx(){
-    good_print "***INSTALL NGINX***";
+zero_step(){
+    good_print "***ZERO STEP***";
     sleep 3;
     sed -i "/#\$nrconf{restart} = 'i';/s/.*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf;
     apt-get -y update;
     apt-get -y upgrade;
-    if [[ 0 != $? ]]; then
-        bad_print "update failed";
-        return 1;
-    fi
+    apt-get -y install -y vim mosh tmux htop git curl wget unzip zip gcc build-essential make;
+    good_print "Step 0 [Zero step].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_nginx(){
+    good_print "***INSTALL NGINX***";
+    sleep 3;
+
     apt-get -y install nginx;
     if [[ 0 != $? ]]; then
         bad_print "install nginx failed";
@@ -125,10 +131,7 @@ install_apache(){
         bad_print "install apach2 failed";
         return 1;
     fi
-    a2enmod proxy_fcgi setenvif;
-    a2enconf php*.*-fpm;
-    systemctl enable apache2;
-    systemctl restart apache2;
+    
     systemctl stop apache2;
     good_print "Step 2 [Install apache2].\nStatus: normal.\n";
     sleep 5;
@@ -224,6 +227,12 @@ install_php(){
         bad_print "install php-curl php-json php-cgi php-gd php-zip php-mbstring php-xml php-xmlrpc failed";
         return 1;
     fi
+    systemctl start apache2;
+    a2enmod proxy_fcgi setenvif;
+    a2enconf php*.*-fpm;
+    systemctl enable apache2;
+    systemctl restart apache2;
+
     good_print "Step 6 [install PHP].\nStatus: normal.\n";
     sleep 5;
     return 0;

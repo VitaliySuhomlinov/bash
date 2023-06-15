@@ -2,7 +2,7 @@
 
 #**
 #*Signature
-#*PHP as module
+#*PHP-FPM
 #*Installing set Linux, Apache, MySQL, PHP (LAMP) in Ubuntu 20.04. PHP will work as Apache module. 
 #*https://www.digitalocean.com/community/tutorials/how-to-install-linux-apache-mysql-php-lamp-stack-on-ubuntu-20-04-ru
 #*Progress-bar http://linuxoid.in/%D0%9F%D1%80%D0%BE%D0%B3%D1%80%D0%B5%D1%81%D1%81-%D0%B1%D0%B0%D1%80_%D0%B4%D0%BB%D1%8F_%D1%81%D0%BA%D1%80%D0%B8%D0%BF%D1%82%D0%BE%D0%B2
@@ -11,6 +11,9 @@
 #*https://tproger.ru/articles/set-up-and-configure-an-apache-server/ 
 #bash and mysql https://stackoverflow.com/questions/20033648/how-to-run-mysql-command-on-bash
 #**
+
+#Сжатие mod deflate \ nginx gzip
+#HTTP2.0
 
 #**
 #*Global variable
@@ -100,20 +103,27 @@ get_approval(){
 #**
 #*Functions actions
 #**
-install_apache(){
-    good_print "***INSTALL APACHE2***";
+zero_step(){
+    good_print "***ZERO STEP***";
     sleep 3;
     sed -i "/#\$nrconf{restart} = 'i';/s/.*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf;
     apt-get -y update;
-    if [[ 0 != $? ]]; then
-        bad_print "update failed";
-        return 1;
-    fi
+    apt-get -y upgrade;
+    apt-get -y install -y vim mosh tmux htop git curl wget unzip zip gcc build-essential make;
+    good_print "Step 0 [Zero step].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_apache(){
+    good_print "***INSTALL APACHE2***";
+    sleep 3;
     apt -y install apache2;
     if [[ 0 != $? ]]; then
         bad_print "install apach2 failed";
         return 1;
     fi
+    
     good_print "Step 1 [Install apache2].\nStatus: normal.\n";
     sleep 5;
     return 0;
@@ -156,14 +166,7 @@ install_mysql(){
         return 1;
     fi
 
-    good_print "The database is installed correctly.";
-    good_print "Now you need to enter the preparation for running the security script.";
-    good_print "Enter this command in the Mysql monitor.";
-    good_print "1. ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ROOT_PASSWORD}';";
-    good_print "2. exit;";
-    good_print "Remember to replace the word PASSWORD with your password";
-    get_approval;
-    mysql 2> /dev/null;
+    echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ROOT_PASSWORD}';" | mysql
 
     good_print "We’re about to launch a security breach.";
     good_print "1. Enter the password you set for the root user in the previous step.";
@@ -177,14 +180,9 @@ install_mysql(){
     get_approval;
     mysql_secure_installation;
 
-    good_print "Next, we need to create a new Mysql user.";
-    good_print "To do this, run the following commands in Mysql Monitor.";
-    good_print "1. CREATE USER 'adminer'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINER_PASSWORD}';";
-    good_print "2. GRANT ALL PRIVILEGES ON *.* TO 'adminer'@'localhost' WITH GRANT OPTION;";
-    good_print "3. exit;"
-    good_print "Don't forget to replace the word password with a password that suits you.";
-    get_approval;
-    mysql -u root -p${ROOT_PASSWORD};
+    echo "CREATE USER 'adminer'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINER_PASSWORD}';" | mysql -u root -p${ROOT_PASSWORD};
+    echo "GRANT ALL PRIVILEGES ON *.* TO 'adminer'@'localhost' WITH GRANT OPTION;" | mysql -u root -p${ROOT_PASSWORD};
+    
     good_print "Step 4 [install Mysql].\nStatus: normal.\n";
     sleep 5;
     return 0;
@@ -193,7 +191,7 @@ install_mysql(){
 install_php(){
     good_print "***INSTALL PHP***";
     sleep 3;
-    apt -y install php libapache2-mod-php php-mysql;
+    apt-get -y install php-fpm php-mysql;
     if [[ 0 != $? ]]; then
         bad_print "install php libapache2-mod-php php-mysql failed";
         return 1;
@@ -204,6 +202,11 @@ install_php(){
         bad_print "install php-curl php-json php-cgi php-gd php-zip php-mbstring php-xml php-xmlrpc failed";
         return 1;
     fi
+    a2enmod proxy_fcgi setenvif;
+    a2enconf php*.*-fpm;
+    systemctl enable apache2;
+    systemctl restart apache2;
+   
     good_print "Step 5 [install PHP].\nStatus: normal.\n";
     sleep 5;
     return 0;
@@ -212,6 +215,16 @@ install_php(){
 create_main_domain(){
     good_print "***CREATE MAIN DOMAIN***";
     sleep 3;
+
+    files=$(ls /var/run/php/);
+    for file in $files; do
+        type=$(file /var/run/php/$file);
+        type=${type#*: };
+        if [[ "socket" == $type ]]; then
+            php_fpm_sock=$file;
+        fi
+    done
+
     mkdir "/var/www/$MAIN_DOMAIN";
     touch "/etc/apache2/sites-available/$MAIN_DOMAIN.conf";
     cat << EOF > "/etc/apache2/sites-available/$MAIN_DOMAIN.conf"
@@ -223,10 +236,17 @@ create_main_domain(){
     ErrorLog \${APACHE_LOG_DIR}/${MAIN_DOMAIN}_error.log
     CustomLog \${APACHE_LOG_DIR}/${MAIN_DOMAIN}_access.log combined
 
-<Directory /var/www/$MAIN_DOMAIN>
-    Require all granted
-    AllowOverride All
-</Directory>
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/var/run/php/${php_fpm_sock}|fcgi://localhost/"
+
+        # Else we can just use a tcp socket:
+        #SetHandler "proxy:fcgi://127.0.0.1:9000"
+    </FilesMatch>
+
+    <Directory /var/www/$MAIN_DOMAIN>
+        Require all granted
+        AllowOverride All
+    </Directory>
 
 </VirtualHost>
 EOF
@@ -253,6 +273,15 @@ create_sub_domain(){
             return 1;    
         fi    
     fi
+    
+    files=$(ls /var/run/php/);
+    for file in $files; do
+        type=$(file /var/run/php/$file);
+        type=${type#*: };
+        if [[ "socket" == $type ]]; then
+            php_fpm_sock=$file;
+        fi
+    done
 
     for subdomain in ${SUBDOMAINS[*]}; do 
         mkdir "/var/www/$subdomain";
@@ -266,10 +295,17 @@ create_sub_domain(){
     ErrorLog \${APACHE_LOG_DIR}/${subdomain}_error.log
     CustomLog \${APACHE_LOG_DIR}/${subdomain}_access.log combined
 
-<Directory /var/www/$subdomain>
-    Require all granted
-    AllowOverride All
-</Directory>
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/var/run/php/${php_fpm_sock}|fcgi://localhost/"
+
+        # Else we can just use a tcp socket:
+        #SetHandler "proxy:fcgi://127.0.0.1:9000"
+    </FilesMatch>
+
+    <Directory /var/www/$subdomain>
+        Require all granted
+        AllowOverride All
+    </Directory>
 
 </VirtualHost>
 EOF
@@ -324,16 +360,10 @@ EOF
 test_php_and_mysql(){
     good_print "***TEST PHP AND MYSQL***";
     sleep 3;
-    good_print "To verify that PHP and Mysql work together, you must do the following.";
-    good_print "Create test data in the database."; 
-    good_print "1. CREATE DATABASE example_database;";
-    good_print "2. SHOW DATABASES;";
-    good_print "3. create TABLE example_database.todo_list (item_id INT AUTO_INCREMENT,content VARCHAR(255),PRIMARY KEY(item_id));";
-    good_print "4. INSERT INTO example_database.todo_list (content) VALUES ( \"My first important item is\");";
-    good_print "5. SELECT * FROM example_database.todo_list;";
-    good_print "6. exit";
-    get_approval;
-    mysql -uadminer -p${ADMINER_PASSWORD};
+
+    echo "CREATE DATABASE example_database;" | mysql -u adminer -p${ADMINER_PASSWORD};
+    echo "CREATE TABLE example_database.todo_list (item_id INT AUTO_INCREMENT,content VARCHAR(255),PRIMARY KEY(item_id));" | mysql -u adminer -p${ADMINER_PASSWORD};
+    echo "INSERT INTO example_database.todo_list (content) VALUES ( \"My first important item is\");" | mysql -u adminer -p${ADMINER_PASSWORD};
 
     touch "/var/www/$MAIN_DOMAIN/todo_list.php";
     echo -e "<?php
@@ -469,6 +499,7 @@ delete_unnecessary(){
 #**
 #*RUN
 #**
+zero_step;
 install_apache;
 configuration_ufw;
 apache_health_check;

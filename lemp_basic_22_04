@@ -114,11 +114,6 @@ zero_step(){
 install_nginx(){
     good_print "***INSTALL NGINX***";
     sleep 3;
-    
-    if [[ 0 != $? ]]; then
-        bad_print "update failed";
-        return 1;
-    fi
     apt -y install nginx;
     if [[ 0 != $? ]]; then
         bad_print "install nginx failed";
