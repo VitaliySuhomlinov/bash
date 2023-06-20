@@ -1,65 +1,9 @@
 #!/bin/bash
-files=$(ls /var/run/php/);
-for i in $files; do
-    type=$(file /var/run/php/$i);
-    type=${type#*: };
-    if [[ "socket" == $type ]]; then
-        PHP_FPM_SOCKET=$i;
-    fi
-done
-
-create_main_domain(){
-    #good_print "***CREATE MAIN DOMAIN***";
-    sleep 3;
-    # mkdir "/var/www/${MAIN_DOMAIN}";
-    # touch "/etc/nginx/sites-available/${MAIN_DOMAIN}.conf";
-    cat << EOF > "data"
-server {
-    listen 80;
-
-    root /var/www/${MAIN_DOMAIN};
-
-    index index.php index.html;
-
-    server_name ${MAIN_DOMAIN};
-
-    location / {
-            try_files \$uri \$uri/ =404;
-    }
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/$PHP_FPM_SOCKET;
-    }
-
-    location ~ /\.ht {
-        deny all;
-    }
-
-    location ^~ /${HIDDEN_URI_PMA}/ {
-        auth_basic "Admin Login";
-        auth_basic_user_file /etc/nginx/pma_pass;
-
-        location ~ \.php$ {
-            include snippets/fastcgi-php.conf;
-            fastcgi_pass unix:/var/run/php/$PHP_FPM_SOCKET;
-        }
-    }
-
-}
-EOF
-
-    # ln -s /etc/nginx/sites-available/${MAIN_DOMAIN}.conf /etc/nginx/sites-enabled/;
-    # unlink /etc/nginx/sites-enabled/default;
-    # systemctl reload nginx;
-    # nginx -t;
-    # sleep 3;
-
-    # sed -i 's/include \/etc\/nginx\/sites-enabled\/\*/include \/etc\/nginx\/sites-enabled\/*.conf/' /etc/nginx/nginx.conf;  
-    # systemctl reload nginx;
-    # good_print "Step 6 [Create main domain].\nStatus: normal.\n";
-    # sleep 5;
-    return 0;
-}
-
-create_main_domain;
+i=$(( 1 ));
+while read str; do
+   if [[ $str == "worker_connections 768;" ]]; then 
+      echo "edeee";
+      sed -i '$ir qqqq' data
+   fi
+   (( i++ ));
+done < data

@@ -515,10 +515,14 @@ install_wordpress_for_main_domain;
 install_wordpress_for_sub_domain;
 delete_unnecessary;
 
-
+cat << EOF
+************
+****DONE****
+************
+EOF
 echo "
            ▄▄▄▄
-           █░░█'
+           █░░█
            █░░█
            █░░░█
          █░░░░░█

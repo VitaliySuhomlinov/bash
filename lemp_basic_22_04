@@ -165,14 +165,7 @@ install_mysql(){
         return 1;
     fi
 
-    good_print "The database is installed correctly.";
-    good_print "Now you need to enter the preparation for running the security script.";
-    good_print "Enter this command in the Mysql monitor.";
-    good_print "1. ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ROOT_PASSWORD}';";
-    good_print "2. exit;";
-    good_print "Remember to replace the word PASSWORD with your password";
-    get_approval;
-    mysql 2> /dev/null;
+    echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ROOT_PASSWORD}';" | mysql
 
     good_print "We’re about to launch a security breach.";
     good_print "1. Enter the password you set for the root user in the previous step.";
@@ -186,14 +179,9 @@ install_mysql(){
     get_approval;
     mysql_secure_installation;
 
-    good_print "Next, we need to create a new Mysql user.";
-    good_print "To do this, run the following commands in Mysql Monitor.";
-    good_print "1. CREATE USER 'adminer'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINER_PASSWORD}';";
-    good_print "2. GRANT ALL PRIVILEGES ON *.* TO 'adminer'@'localhost' WITH GRANT OPTION;";
-    good_print "3. exit;"
-    good_print "Don't forget to replace the word password with a password that suits you.";
-    get_approval;
-    mysql -u root -p${ROOT_PASSWORD};
+    echo "CREATE USER 'adminer'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINER_PASSWORD}';" | mysql -u root -p${ROOT_PASSWORD};
+    echo "GRANT ALL PRIVILEGES ON *.* TO 'adminer'@'localhost' WITH GRANT OPTION;" | mysql -u root -p${ROOT_PASSWORD};
+    
     good_print "Step 4 [install Mysql].\nStatus: normal.\n";
     sleep 5;
     return 0;
@@ -359,16 +347,10 @@ EOF
 test_php_and_mysql(){
     good_print "***TEST PHP AND MYSQL***";
     sleep 3;
-    good_print "To verify that PHP and Mysql work together, you must do the following.";
-    good_print "Create test data in the database."; 
-    good_print "1. CREATE DATABASE example_database;";
-    good_print "2. SHOW DATABASES;";
-    good_print "3. create TABLE example_database.todo_list (item_id INT AUTO_INCREMENT,content VARCHAR(255),PRIMARY KEY(item_id));";
-    good_print "4. INSERT INTO example_database.todo_list (content) VALUES ( \"My first important item is\");";
-    good_print "5. SELECT * FROM example_database.todo_list;";
-    good_print "6. exit";
-    get_approval;
-    mysql -uadminer -p${ADMINER_PASSWORD};
+
+    echo "CREATE DATABASE example_database;" | mysql -u adminer -p${ADMINER_PASSWORD};
+    echo "CREATE TABLE example_database.todo_list (item_id INT AUTO_INCREMENT,content VARCHAR(255),PRIMARY KEY(item_id));" | mysql -u adminer -p${ADMINER_PASSWORD};
+    echo "INSERT INTO example_database.todo_list (content) VALUES ( \"My first important item is\");" | mysql -u adminer -p${ADMINER_PASSWORD};
 
     touch "/var/www/$MAIN_DOMAIN/todo_list.php";
     echo -e "<?php
@@ -392,7 +374,7 @@ test_php_and_mysql(){
     good_print "Now you can check if php and mysql are working correctly. Query http://your_ip/todo_list.php or http://$MAIN_DOMAIN/todo_list.php";
     get_approval;
     rm "/var/www/$MAIN_DOMAIN/todo_list.php";
-    good_print "Step 9 [Test PHP and MySQL].\nStatus: normal.\n";
+    good_print "Step 10 [Test PHP and MySQL].\nStatus: normal.\n";
     sleep 5;
     return 0;
 
@@ -452,7 +434,7 @@ EOF
 adminer:$crypt
 EOF
     systemctl reload nginx;
-    good_print "Step 11 [Install_phpmyqdmin].\nStatus: normal.\n";
+    good_print "Step 11 [Install_phpmyadmin].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -509,18 +491,20 @@ delete_unnecessary(){
     return 0;
 }
 
+install_ssl(){
+    https://losst.pro/ustanovka-ssl-sertifikata-apache-ot-lets-encrypt
+    https://help.ubuntu.ru/wiki/apache_%D0%B8_https
+    return 0;
+    вероятно вопрос в том, что закрыт доступ к https через ufw
+}
+
 #basic_protection(){
     #адрес phpmyadmin
     #если в директории нет файла по умолчанию то не показывать содержимое (directory listing)
     #return 0;
 #}
 
-#install_ssl(){
-    #https://losst.pro/ustanovka-ssl-sertifikata-apache-ot-lets-encrypt
-    #https://help.ubuntu.ru/wiki/apache_%D0%B8_https
-    #return 0;
-    #вероятно вопрос в том, что закрыт доступ к https через ufw
-#}
+
 
 #install_wordpress_cli(){
     #return 0;
