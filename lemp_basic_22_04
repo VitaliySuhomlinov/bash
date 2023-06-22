@@ -302,7 +302,7 @@ server {
     access_log /var/log/nginx/${subdomain}.access.log;
 
     location / {
-            try_files \$uri \$uri/ =404;
+        try_files $uri $uri/ /index.php?$args;
     }
 
     location ~ \.php$ {
@@ -374,16 +374,25 @@ test_php_and_mysql(){
     good_print "Now you can check if php and mysql are working correctly. Query http://your_ip/todo_list.php or http://$MAIN_DOMAIN/todo_list.php";
     get_approval;
     rm "/var/www/$MAIN_DOMAIN/todo_list.php";
-    good_print "Step 10 [Test PHP and MySQL].\nStatus: normal.\n";
+    good_print "Step 9 [Test PHP and MySQL].\nStatus: normal.\n";
     sleep 5;
     return 0;
 
 }
 
-
-redirect_from_ip_to_main_domain(){
+close_request_on_ip(){
     good_print "***REDIRECT FROM IP TO MAIN DOMAIN***";
     sleep 3;
+    touch "/etc/nginx/sites-available/def.conf";
+    cat << EOF > "/etc/nginx/sites-available/def.conf"                                         
+server {
+    listen 80 default_server;
+    server_name _;
+    return 403;
+}
+EOF
+    ln -s /etc/nginx/sites-available/def.conf /etc/nginx/sites-enabled/def.conf;
+    systemctl restart nginx;
     good_print "Step 10 [Redirect from ip to main domain].\nStatus: normal.\n";
     sleep 5;
     return 0;
@@ -491,20 +500,27 @@ delete_unnecessary(){
     return 0;
 }
 
-install_ssl(){
-    https://losst.pro/ustanovka-ssl-sertifikata-apache-ot-lets-encrypt
-    https://help.ubuntu.ru/wiki/apache_%D0%B8_https
-    return 0;
-    вероятно вопрос в том, что закрыт доступ к https через ufw
-}
-
-#basic_protection(){
+basic_protection(){
+    good_print "***BASIC PROTECTION***";
+    sleep 3;
     #адрес phpmyadmin
     #если в директории нет файла по умолчанию то не показывать содержимое (directory listing)
-    #return 0;
-#}
+    sed -i 's/# server_tokens off;/server_tokens off;/' /etc/nginx/nginx.conf;
+    good_print "Step 15 [Basic protection].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
 
-
+install_ssl(){
+    #https://losst.pro/ustanovka-ssl-sertifikata-apache-ot-lets-encrypt
+    #https://help.ubuntu.ru/wiki/apache_%D0%B8_https
+    good_print "***INSTALL SSL***";
+    sleep 3;
+    good_print "Step 16 [Install ssl].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+    #вероятно вопрос в том, что закрыт доступ к https через ufw
+}
 
 #install_wordpress_cli(){
     #return 0;
@@ -521,13 +537,15 @@ install_mysql;
 install_php;
 create_main_domain;
 create_sub_domain;
-redirect_from_ip_to_main_domain;
 test_php;
 test_php_and_mysql;
+close_request_on_ip;
 install_phpmyadmin;
 install_wordpress_for_main_domain;
 install_wordpress_for_sub_domain;
 delete_unnecessary;
+basic_protection;
+install_ssl;
 
 echo "
            ▄▄▄▄

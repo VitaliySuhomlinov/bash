@@ -108,7 +108,6 @@ zero_step(){
     sleep 3;
     sed -i "/#\$nrconf{restart} = 'i';/s/.*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf;
     apt-get -y update;
-    apt-get -y upgrade;
     apt-get -y install -y vim mosh tmux htop git curl wget unzip zip gcc build-essential make;
     good_print "Step 0 [Zero step].\nStatus: normal.\n";
     sleep 5;
@@ -465,6 +464,7 @@ install_wordpress_for_sub_domain(){
         chown -R "root:www-data" "/var/www/";
         chmod -R "g+w" "/var/www/";
     done
+
     good_print "Step 13 [Install wordpress for sub domain].\nStatus: normal.\n";
     sleep 5;
     return 0;
