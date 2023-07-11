@@ -137,7 +137,7 @@ configuration_ufw(){
 
     if [[ $ufw_status != *"Status: active"* ]]; then
         good_print "To this question (Command may disrupt existing ssh connections. Proceed with operation (y|n)?) you can answer yes (y)";
-        sleep 5;
+        sleep 1;
         ufw enable;
     fi
     ufw status;

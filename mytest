@@ -1,9 +1,7 @@
 #!/bin/bash
-i=$(( 1 ));
-while read str; do
-   if [[ $str == "worker_connections 768;" ]]; then 
-      echo "edeee";
-      sed -i '$ir qqqq' data
-   fi
-   (( i++ ));
-done < data
+SSL="no";
+if [[ "yes" != $SSL ]]; then
+   echo "exit";
+   exit;
+fi
+echo "install ssl";

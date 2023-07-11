@@ -12,19 +12,42 @@
 #**
 #*Global variable
 #**
-SWD=${0%/*};
+#server
 MAIN_DOMAIN="scriptcraft.fun";
 SUBDOMAINS=(
     "dev.scriptcraft.fun" 
     "stg.scriptcraft.fun"
     );
-ROOT_PASSWORD="root555";
-ADMINER_PASSWORD="rokit555";
-AUTH_PASS_PMA="rokit555!!!";
+
+#mysql    
+MYSQL_ROOT_PASSWORD="root555";
+MYSQL_ADMIN_USER="adminer";
+MYSQL_ADMIN_PASSWORD="rokit555";
+
+#phpmyadmin
+PMA_ADMIN_USER="adminer";
+PMA_AUTH_PASS="rokit555!!!";
+PMA_HIDDEN_URI=$(head -c 100 /dev/urandom | base64 | sed 's/[+=/A-Z]//g' | tail -c 9);
+
+#wordpress
+WP_SITE_TITLE="TEST";
+WP_ADMIN_USER="adminer";
+WP_ADMIN_PASSWORD="rokit555";
+WP_ADMIN_EMAIL="scriptcraft.site@gmail.com";
+WP_DB_PREFIX="wp_";
+WP_SITE_DESCRIPTION="My tets site";
+WP_PERMALINK_STRUCTURE="/%postname%/";
+WP_THEME_NAME="twentytwentyone";
+
+#ftp
+FTP_USER_NAME="";
+
+
+#other
+SWD=${0%/*};
 INSTALL_SSL="yes";
-ADMIN_EMAIL="scriptcraft.site@gmail.com";
 IP=$(wget -qO- ifconfig.me);
-HIDDEN_URI_PMA=$(head -c 100 /dev/urandom | base64 | sed 's/[+=/A-Z]//g' | tail -c 9);
+
 
 #**
 #*Start check
@@ -131,13 +154,15 @@ configuration_ufw(){
     ufw allow 'Nginx HTTP';
     if [[ "yes" == $INSTALL_SSL ]]; then 
         ufw allow 'Nginx HTTPS';
-    fi    
+    fi
+    ufw allow 20/tcp;
+    ufw allow 21/tcp;    
     ufw allow in "OpenSSH";
     ufw_status=$(ufw status);
 
     if [[ $ufw_status != *"Status: active"* ]]; then
         good_print "To this question (Command may disrupt existing ssh connections. Proceed with operation (y|n)?) you can answer yes (y)";
-        sleep 5;
+        sleep 1;
         ufw enable;
     fi
     ufw status;
@@ -165,7 +190,7 @@ install_mysql(){
         return 1;
     fi
 
-    echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ROOT_PASSWORD}';" | mysql
+    echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASSWORD}';" | mysql
 
     good_print "We’re about to launch a security breach.";
     good_print "1. Enter the password you set for the root user in the previous step.";
@@ -179,8 +204,8 @@ install_mysql(){
     get_approval;
     mysql_secure_installation;
 
-    echo "CREATE USER 'adminer'@'localhost' IDENTIFIED WITH mysql_native_password BY '${ADMINER_PASSWORD}';" | mysql -u root -p${ROOT_PASSWORD};
-    echo "GRANT ALL PRIVILEGES ON *.* TO 'adminer'@'localhost' WITH GRANT OPTION;" | mysql -u root -p${ROOT_PASSWORD};
+    echo "CREATE USER '${MYSQL_ADMIN_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ADMIN_PASSWORD}';" | mysql -u root -p${MYSQL_ROOT_PASSWORD};
+    echo "GRANT ALL PRIVILEGES ON *.* TO '${MYSQL_ADMIN_USER}'@'localhost' WITH GRANT OPTION;" | mysql -u root -p${MYSQL_ROOT_PASSWORD};
     
     good_print "Step 4 [install Mysql].\nStatus: normal.\n";
     sleep 5;
@@ -235,7 +260,7 @@ server {
     access_log /var/log/nginx/${MAIN_DOMAIN}.access.log;
 
     location / {
-            try_files \$uri \$uri/ =404;
+        try_files \$uri \$uri/ /index.php?\$args;
     }
 
     location ~ \.php$ {
@@ -247,7 +272,7 @@ server {
         deny all;
     }
 
-    location ^~ /${HIDDEN_URI_PMA}/ {
+    location ^~ /${PMA_HIDDEN_URI}/ {
         auth_basic "Admin Login";
         auth_basic_user_file /etc/nginx/pma_pass;
 
@@ -302,7 +327,7 @@ server {
     access_log /var/log/nginx/${subdomain}.access.log;
 
     location / {
-        try_files $uri $uri/ /index.php?$args;
+        try_files \$uri \$uri/ /index.php?\$args;
     }
 
     location ~ \.php$ {
@@ -348,14 +373,14 @@ test_php_and_mysql(){
     good_print "***TEST PHP AND MYSQL***";
     sleep 3;
 
-    echo "CREATE DATABASE example_database;" | mysql -u adminer -p${ADMINER_PASSWORD};
-    echo "CREATE TABLE example_database.todo_list (item_id INT AUTO_INCREMENT,content VARCHAR(255),PRIMARY KEY(item_id));" | mysql -u adminer -p${ADMINER_PASSWORD};
-    echo "INSERT INTO example_database.todo_list (content) VALUES ( \"My first important item is\");" | mysql -u adminer -p${ADMINER_PASSWORD};
+    echo "CREATE DATABASE example_database;" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+    echo "CREATE TABLE example_database.todo_list (item_id INT AUTO_INCREMENT,content VARCHAR(255),PRIMARY KEY(item_id));" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+    echo "INSERT INTO example_database.todo_list (content) VALUES ( \"My first important item is\");" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
 
     touch "/var/www/$MAIN_DOMAIN/todo_list.php";
     echo -e "<?php
-    \$user = 'adminer';
-    \$password = '${ADMINER_PASSWORD}';
+    \$user = '${MYSQL_ADMIN_USER}';
+    \$password = '${MYSQL_ADMIN_PASSWORD}';
     \$database = 'example_database';
     \$table = 'todo_list';" > "/var/www/$MAIN_DOMAIN/todo_list.php";
 
@@ -407,18 +432,136 @@ install_phpmyadmin(){
     good_print "Here's a list of clues:";
     good_print "1. the system will ask you for which server to configure phpmyadmin. Just press Tab (without selecting either apache or lighttpd) and then OK.";
     good_print "2. Next, the installer will prompt to create a database for phpMyAdmin, which will contain the official information of the program and the necessary settings, you must agree to choose Yes:";
-    good_print "Enter the password for the user phpmyadmin. You can use the same password as the adminer user.  Or any other password.";
+    good_print "Enter the password for the user phpmyadmin. You can use the same password as the ${PMA_ADMIN_USER} user.  Or any other password.";
     get_approval;
     apt -y install phpmyadmin;
     ln -s /usr/share/phpmyadmin /var/www/${MAIN_DOMAIN}/phpmyadmin;
     good_print "At this point, phpmyadmin is already available at http://your_ip/phpmyadmin or http://$MAIN_DOMAIN/phpmyadmin";
     get_approval;
 
-    
-    mv /var/www/${MAIN_DOMAIN}/phpmyadmin /var/www/${MAIN_DOMAIN}/${HIDDEN_URI_PMA};
-    touch /tmp/LEMP_basic_22_04_report;
-    echo "PHPMYADMIN - http://${MAIN_DOMAIN}/${HIDDEN_URI_PMA}" >> /tmp/LEMP_basic_22_04_report;
+    systemctl reload nginx;
+    good_print "Step 11 [Install_phpmyadmin].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
 
+install_wordpress_cli(){
+    good_print "***INSTALL WORDPRESS CLI***";
+    sleep 3;
+    curl -L https://raw.github.com/wp-cli/builds/gh-pages/phar/wp-cli.phar > /tmp/wp-cli.phar;
+    chmod +x /tmp/wp-cli.phar;
+    mv /tmp/wp-cli.phar /usr/bin/wp;
+    good_print "Step 12 [Install wordpress cli].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_wordpress_for_main_domain(){
+    good_print "***INSTALL WORDPRESS FOR MAIN DOMAIN***";
+    sleep 3;
+    
+    cd /var/www/$MAIN_DOMAIN/;
+    wp core download --force --allow-root;
+
+    db_name=${MAIN_DOMAIN//./_};
+    [ -f wp-config.php ] || wp config create --allow-root \
+    --dbhost="localhost" \
+    --dbname="${db_name}" \
+    --dbuser="${MYSQL_ADMIN_USER}" \
+    --dbpass="${MYSQL_ADMIN_PASSWORD}" \
+    --dbprefix="${WP_DB_PREFIX}";
+    
+    echo "CREATE DATABASE ${db_name};" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+
+    wp core install --allow-root\
+    --url="http://${MAIN_DOMAIN}" \
+    --title="${WP_SITE_TITLE}" \
+    --admin_user="${WP_ADMIN_USER}" \
+    --admin_password="${WP_ADMIN_PASSWORD}" \
+    --admin_email="${WP_ADMIN_EMAIL}" \
+    --skip-email
+
+    echo "define('FS_METHOD', 'direct');" >> wp-config.php;
+    wp plugin delete akismet hello --allow-root;
+    wp option update blogdescription "${WP_SITE_DESCRIPTION}" --allow-root
+    wp rewrite structure "${WP_PERMALINK_STRUCTURE}" --allow-root;
+    wp theme activate "${WP_THEME_NAME}" --allow-root;
+    wp theme delete twentytwenty twentytwentytwo twentytwentythree --allow-root;
+
+    chown -R "root:www-data" "/var/www/";
+    chmod -R "g+w" "/var/www/";
+    good_print "Step 13 [Install wordpress for main domain].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_wordpress_for_sub_domain(){
+    if [ -z ${SUBDOMAINS} ]; then
+        return 1;
+    else
+        if [[ 0 < ${#SUBDOMAINS[@]} ]]; then 
+            good_print "***INSTALL WORDPRESS FOR SUB DOMAIN***";
+            sleep 3;
+        else
+            return 1;    
+        fi    
+    fi
+
+    for subdomain in ${SUBDOMAINS[*]}; do
+
+        cd /var/www/$subdomain/;
+        wp core download --force --allow-root;
+
+        db_name=${subdomain//./_};
+        [ -f wp-config.php ] || wp config create --allow-root \
+        --dbhost="localhost" \
+        --dbname="${db_name}" \
+        --dbuser="${MYSQL_ADMIN_USER}" \
+        --dbpass="${MYSQL_ADMIN_PASSWORD}" \
+        --dbprefix="${WP_DB_PREFIX}";
+    
+        echo "CREATE DATABASE ${db_name};" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+
+        wp core install --allow-root \
+        --url="http://${subdomain}" \
+        --title="${WP_SITE_TITLE}" \
+        --admin_user="${WP_ADMIN_USER}" \
+        --admin_password="${WP_ADMIN_PASSWORD}" \
+        --admin_email="${WP_ADMIN_EMAIL}" \
+        --skip-email
+
+        echo "define('FS_METHOD', 'direct');" >> wp-config.php;
+        wp plugin delete akismet hello --allow-root;
+        wp option update blogdescription "${WP_SITE_DESCRIPTION}" --allow-root
+        wp rewrite structure "${WP_PERMALINK_STRUCTURE}" --allow-root;
+        wp theme activate "${WP_THEME_NAME}" --allow-root;
+        wp theme delete twentytwenty twentytwentytwo twentytwentythree --allow-root;
+
+        chown -R "root:www-data" "/var/www/";
+        chmod -R "g+w" "/var/www/";
+    done
+    good_print "Step 14 [Install wordpress for sub domain].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+    #https://www.youtube.com/watch?v=VF3VvP9v0Y8
+}
+
+delete_unnecessary(){
+    good_print "***DELETE UNNECESSARY***";
+    sleep 3;
+    rm -rf "/var/www/html";
+    echo "DROP DATABASE IF EXISTS example_database;" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+    good_print "Step 15 [Delete unnecessary].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+basic_protection(){
+    good_print "***BASIC PROTECTION***";
+    sleep 3;
+    
+    #скрытый адрес для phpmyadmin и браузерная аутентификация 
+    mv /var/www/${MAIN_DOMAIN}/phpmyadmin /var/www/${MAIN_DOMAIN}/${PMA_HIDDEN_URI};
     touch "/etc/phpmyadmin/conf.d/pma_secure.php";
     cat << EOF > "/etc/phpmyadmin/conf.d/pma_secure.php"
 <?php
@@ -437,76 +580,19 @@ install_phpmyadmin(){
 ?>
 EOF
 
-    crypt=$(openssl passwd $AUTH_PASS_PMA);
+    crypt=$(openssl passwd ${PMA_AUTH_PASS});
     touch "/etc/nginx/pma_pass";
     cat << EOF > "/etc/nginx/pma_pass"
-adminer:$crypt
+${PMA_ADMIN_USER}:$crypt
 EOF
-    systemctl reload nginx;
-    good_print "Step 11 [Install_phpmyadmin].\nStatus: normal.\n";
-    sleep 5;
-    return 0;
-}
 
-install_wordpress_for_main_domain(){
-    good_print "***INSTALL WORDPRESS FOR MAIN DOMAIN***";
-    sleep 3;
-    wget -P "/var/www/$MAIN_DOMAIN/" "https://wordpress.org/latest.zip";
-    apt -y install unzip;
-    unzip /var/www/$MAIN_DOMAIN/latest.zip -d /var/www/$MAIN_DOMAIN/;
-    rm "/var/www/$MAIN_DOMAIN/latest.zip";
-    mv /var/www/$MAIN_DOMAIN/wordpress/* /var/www/$MAIN_DOMAIN/;
-    rm -rf "/var/www/$MAIN_DOMAIN/wordpress/";
-    chown -R "root:www-data" "/var/www/";
-    chmod -R "g+w" "/var/www/";
-    good_print "Step 12 [Install wordpress for main domain].\nStatus: normal.\n";
-    sleep 5;
-    return 0;
-}
-
-install_wordpress_for_sub_domain(){
-    if [ -z ${SUBDOMAINS} ]; then
-        return 1;
-    else
-        if [[ 0 < ${#SUBDOMAINS[@]} ]]; then 
-            good_print "***INSTALL WORDPRESS FOR SUB DOMAIN***";
-            sleep 3;
-        else
-            return 1;    
-        fi    
-    fi
-
-    for subdomain in ${SUBDOMAINS[*]}; do
-        wget -P "/var/www/$subdomain/" "https://wordpress.org/latest.zip";
-        unzip /var/www/$subdomain/latest.zip -d /var/www/$subdomain/;
-        rm "/var/www/$subdomain/latest.zip";
-        mv /var/www/$subdomain/wordpress/* /var/www/$subdomain/;
-        rm -rf "/var/www/$subdomain/wordpress/";
-        chown -R "root:www-data" "/var/www/";
-        chmod -R "g+w" "/var/www/";
-    done
-    good_print "Step 13 [Install wordpress for sub domain].\nStatus: normal.\n";
-    sleep 5;
-    return 0;
-    #https://www.youtube.com/watch?v=VF3VvP9v0Y8
-}
-
-delete_unnecessary(){
-    good_print "***DELETE UNNECESSARY***";
-    sleep 3;
-    rm -rf "/var/www/html";
-    good_print "Step 14 [Delete unnecessary].\nStatus: normal.\n";
-    sleep 5;
-    return 0;
-}
-
-basic_protection(){
-    good_print "***BASIC PROTECTION***";
-    sleep 3;
-    #адрес phpmyadmin
     #если в директории нет файла по умолчанию то не показывать содержимое (directory listing)
+
+    #не отображать версию nginx в консоли браузера
     sed -i 's/# server_tokens off;/server_tokens off;/' /etc/nginx/nginx.conf;
-    good_print "Step 15 [Basic protection].\nStatus: normal.\n";
+    systemctl restart nginx;
+
+    good_print "Step 16 [Basic protection].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -516,15 +602,27 @@ install_ssl(){
     #https://help.ubuntu.ru/wiki/apache_%D0%B8_https
     good_print "***INSTALL SSL***";
     sleep 3;
-    good_print "Step 16 [Install ssl].\nStatus: normal.\n";
+    if [[ "yes" != $INSTALL_SSL ]]; then
+        echo "SSL will not be install";
+        return 0;
+    fi
+    snap install core; 
+    snap refresh core;
+    snap install --classic certbot;
+    certbot --nginx;
+
+    good_print "Step 17 [Install ssl].\nStatus: normal.\n";
     sleep 5;
     return 0;
-    #вероятно вопрос в том, что закрыт доступ к https через ufw
 }
 
-#install_wordpress_cli(){
-    #return 0;
-#}
+install_vsftpd(){
+    good_print "***INSTALL VSFTPD***";
+    sleep 3;
+    apt -y install vsftpd;
+    cp /etc/vsftpd.conf /etc/vsftpd.conf.backup;
+
+}
 
 #**
 #*RUN
@@ -541,11 +639,18 @@ test_php;
 test_php_and_mysql;
 close_request_on_ip;
 install_phpmyadmin;
+install_wordpress_cli;
 install_wordpress_for_main_domain;
 install_wordpress_for_sub_domain;
 delete_unnecessary;
 basic_protection;
 install_ssl;
+
+cat << EOF
+************
+****DONE****
+************
+EOF
 
 echo "
            ▄▄▄▄
@@ -556,7 +661,7 @@ echo "
 ███████▄▄█░░░░░██████▄
 ▓▓▓▓▓▓█░░░░░░░░░░░░░░█
 ▓▓▓▓▓▓█░░░░░░░░░░░░░░░█
-▓▓scriptcraft.site ░░░█
+▓▓ ${MAIN_DOMAIN} ░░░█
 ▓▓▓▓▓▓█░░░░░░░░░░░░░░█
 ▓▓▓▓▓▓█░░░░░░░░░░░░░░█
 ▓▓▓▓▓▓█████░░░░░░░░░█
