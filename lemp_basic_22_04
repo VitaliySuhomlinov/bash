@@ -7,40 +7,45 @@
 #*Phpmyadmin https://losst.pro/ustanovka-phpmyadmin-s-nginx-v-ubuntu-20-04 OR 
 #*https://www.digitalocean.com/community/tutorials/how-to-install-and-secure-phpmyadmin-with-nginx-on-an-ubuntu-20-04-server
 #* Settings phpmyadmin - https://php-myadmin.ru/doc/config/
+#*Install vsftpd https://www.digitalocean.com/community/tutorials/how-to-set-up-vsftpd-for-a-user-s-directory-on-ubuntu-20-04
 #**
 
 #**
 #*Global variable
 #**
+#system user
+SYSTEM_USER_NAME="adminer";
+SYSTEM_USER_PASSWORD="lalaland";
+
 #server
-MAIN_DOMAIN="scriptcraft.fun";
+MAIN_DOMAIN="scriptcraft.space";
 SUBDOMAINS=(
-    "dev.scriptcraft.fun" 
-    "stg.scriptcraft.fun"
+    "dev.scriptcraft.space" 
+    "stg.scriptcraft.space"
     );
 
 #mysql    
 MYSQL_ROOT_PASSWORD="root555";
 MYSQL_ADMIN_USER="adminer";
-MYSQL_ADMIN_PASSWORD="rokit555";
+MYSQL_ADMIN_PASSWORD="lalaland";
 
 #phpmyadmin
 PMA_ADMIN_USER="adminer";
-PMA_AUTH_PASS="rokit555!!!";
+PMA_AUTH_PASS="lalaland";
 PMA_HIDDEN_URI=$(head -c 100 /dev/urandom | base64 | sed 's/[+=/A-Z]//g' | tail -c 9);
 
 #wordpress
 WP_SITE_TITLE="TEST";
 WP_ADMIN_USER="adminer";
-WP_ADMIN_PASSWORD="rokit555";
+WP_ADMIN_PASSWORD="lalaland";
 WP_ADMIN_EMAIL="scriptcraft.site@gmail.com";
 WP_DB_PREFIX="wp_";
 WP_SITE_DESCRIPTION="My tets site";
 WP_PERMALINK_STRUCTURE="/%postname%/";
 WP_THEME_NAME="twentytwentyone";
 
-#ftp
-FTP_USER_NAME="";
+#zabbix
+ZABBIX_PASSWORD="lalaland";
 
 
 #other
@@ -134,6 +139,16 @@ zero_step(){
     return 0;
 }
 
+create_user(){
+    good_print "***CREATE USER***";
+    sleep 3;
+    useradd -s /bin/bash -d /home/$SYSTEM_USER_NAME -m $SYSTEM_USER_NAME;
+    echo -e "${SYSTEM_USER_PASSWORD}\n${SYSTEM_USER_PASSWORD}\n" | passwd $SYSTEM_USER_NAME;
+    good_print "Step 1 [Create user].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
 install_nginx(){
     good_print "***INSTALL NGINX***";
     sleep 3;
@@ -143,7 +158,7 @@ install_nginx(){
         return 1;
     fi
     systemctl enable nginx;
-    good_print "Step 1 [Install nginx].\nStatus: normal.\n";
+    good_print "Step 2 [Install nginx].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -155,8 +170,8 @@ configuration_ufw(){
     if [[ "yes" == $INSTALL_SSL ]]; then 
         ufw allow 'Nginx HTTPS';
     fi
-    ufw allow 20/tcp;
-    ufw allow 21/tcp;    
+    ufw allow 20,21,990/tcp;
+    ufw allow 40000:50000/tcp;   
     ufw allow in "OpenSSH";
     ufw_status=$(ufw status);
 
@@ -166,7 +181,7 @@ configuration_ufw(){
         ufw enable;
     fi
     ufw status;
-    good_print "Step 2 [Configuration UFW].\nStatus: normal.\n";
+    good_print "Step 3 [Configuration UFW].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -176,7 +191,7 @@ nginx_health_check(){
     sleep 3;
     good_print "At this stage you can check the Apache. Make a request from the browser or through curl http://ip_addr:port or http://$MAIN_DOMAIN:port You should see the start page and the Apache server.";
     get_approval;
-    good_print "Step 3 [Nginx health check].\nStatus: normal.\n";
+    good_print "Step 4 [Nginx health check].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -207,7 +222,7 @@ install_mysql(){
     echo "CREATE USER '${MYSQL_ADMIN_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ADMIN_PASSWORD}';" | mysql -u root -p${MYSQL_ROOT_PASSWORD};
     echo "GRANT ALL PRIVILEGES ON *.* TO '${MYSQL_ADMIN_USER}'@'localhost' WITH GRANT OPTION;" | mysql -u root -p${MYSQL_ROOT_PASSWORD};
     
-    good_print "Step 4 [install Mysql].\nStatus: normal.\n";
+    good_print "Step 5 [install Mysql].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -226,7 +241,7 @@ install_php(){
         bad_print "install php-curl php-json php-cgi php-gd php-zip php-mbstring php-xml php-xmlrpc failed";
         return 1;
     fi
-    good_print "Step 5 [install PHP].\nStatus: normal.\n";
+    good_print "Step 6 [install PHP].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -293,7 +308,7 @@ EOF
 
     sed -i 's/include \/etc\/nginx\/sites-enabled\/\*/include \/etc\/nginx\/sites-enabled\/*.conf/' /etc/nginx/nginx.conf;  
     systemctl reload nginx;
-    good_print "Step 6 [Create main domain].\nStatus: normal.\n";
+    good_print "Step 7 [Create main domain].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -348,7 +363,7 @@ EOF
     systemctl reload nginx;
     nginx -t;
     sleep 3;
-    good_print "Step 7 [Create sub domain].\nStatus: normal.\n";
+    good_print "Step 8 [Create sub domain].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -364,7 +379,7 @@ EOF
     good_print "Now you can check if php is working correctly. Query http://your_ip/info.php or http://$MAIN_DOMAIN/info.php";
     get_approval;
     rm "/var/www/$MAIN_DOMAIN/info.php";
-    good_print "Step 8 [Test PHP].\nStatus: normal.\n";
+    good_print "Step 9 [Test PHP].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -399,7 +414,7 @@ test_php_and_mysql(){
     good_print "Now you can check if php and mysql are working correctly. Query http://your_ip/todo_list.php or http://$MAIN_DOMAIN/todo_list.php";
     get_approval;
     rm "/var/www/$MAIN_DOMAIN/todo_list.php";
-    good_print "Step 9 [Test PHP and MySQL].\nStatus: normal.\n";
+    good_print "Step 10 [Test PHP and MySQL].\nStatus: normal.\n";
     sleep 5;
     return 0;
 
@@ -418,7 +433,7 @@ server {
 EOF
     ln -s /etc/nginx/sites-available/def.conf /etc/nginx/sites-enabled/def.conf;
     systemctl restart nginx;
-    good_print "Step 10 [Redirect from ip to main domain].\nStatus: normal.\n";
+    good_print "Step 11 [Redirect from ip to main domain].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -440,7 +455,7 @@ install_phpmyadmin(){
     get_approval;
 
     systemctl reload nginx;
-    good_print "Step 11 [Install_phpmyadmin].\nStatus: normal.\n";
+    good_print "Step 12 [Install_phpmyadmin].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -451,7 +466,7 @@ install_wordpress_cli(){
     curl -L https://raw.github.com/wp-cli/builds/gh-pages/phar/wp-cli.phar > /tmp/wp-cli.phar;
     chmod +x /tmp/wp-cli.phar;
     mv /tmp/wp-cli.phar /usr/bin/wp;
-    good_print "Step 12 [Install wordpress cli].\nStatus: normal.\n";
+    good_print "Step 13 [Install wordpress cli].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -488,9 +503,9 @@ install_wordpress_for_main_domain(){
     wp theme activate "${WP_THEME_NAME}" --allow-root;
     wp theme delete twentytwenty twentytwentytwo twentytwentythree --allow-root;
 
-    chown -R "root:www-data" "/var/www/";
+    chown -R "${SYSTEM_USER_NAME}:www-data" "/var/www/";
     chmod -R "g+w" "/var/www/";
-    good_print "Step 13 [Install wordpress for main domain].\nStatus: normal.\n";
+    good_print "Step 14 [Install wordpress for main domain].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -537,10 +552,10 @@ install_wordpress_for_sub_domain(){
         wp theme activate "${WP_THEME_NAME}" --allow-root;
         wp theme delete twentytwenty twentytwentytwo twentytwentythree --allow-root;
 
-        chown -R "root:www-data" "/var/www/";
+        chown -R "${SYSTEM_USER_NAME}:www-data" "/var/www/";
         chmod -R "g+w" "/var/www/";
     done
-    good_print "Step 14 [Install wordpress for sub domain].\nStatus: normal.\n";
+    good_print "Step 15 [Install wordpress for sub domain].\nStatus: normal.\n";
     sleep 5;
     return 0;
     #https://www.youtube.com/watch?v=VF3VvP9v0Y8
@@ -551,7 +566,7 @@ delete_unnecessary(){
     sleep 3;
     rm -rf "/var/www/html";
     echo "DROP DATABASE IF EXISTS example_database;" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
-    good_print "Step 15 [Delete unnecessary].\nStatus: normal.\n";
+    good_print "Step 16 [Delete unnecessary].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -592,7 +607,80 @@ EOF
     sed -i 's/# server_tokens off;/server_tokens off;/' /etc/nginx/nginx.conf;
     systemctl restart nginx;
 
-    good_print "Step 16 [Basic protection].\nStatus: normal.\n";
+    good_print "Step 17 [Basic protection].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_vsftpd(){
+    good_print "***INSTALL VSFTPD***";
+    sleep 3;
+    apt -y install vsftpd;
+    systemctl enable vsftpd;
+    cp /etc/vsftpd.conf /etc/vsftpd.conf.backup;
+    sed -i 's/#write_enable=YES/write_enable=YES/g' /etc/vsftpd.conf;
+    sed -i 's/#chroot_local_user=YES/chroot_local_user=YES/g' /etc/vsftpd.conf;
+    sed -i 's/ssl_enable=NO/ssl_enable=YES/g' /etc/vsftpd.conf;
+    sed -i 's/#local_umask=022/local_umask=022/g' /etc/vsftpd.conf;
+    sed -i 's/#utf8_filesystem=YES/utf8_filesystem=YES/g' /etc/vsftpd.conf;
+
+    cat << EOF >> "/etc/vsftpd.conf"
+user_sub_token=$USER
+local_root=/var/www
+pasv_min_port=40000
+pasv_max_port=50000
+userlist_enable=YES
+userlist_file=/etc/vsftpd.userlist
+userlist_deny=NO
+allow_writeable_chroot=YES
+EOF
+
+    echo "${SYSTEM_USER_NAME}" | tee -a /etc/vsftpd.userlist;
+    systemctl restart vsftpd;
+
+    good_print "Step 18 [Install vsftpd].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+add_user_in_additional_group(){
+    good_print "***ADD USER IN ADDITIONAL GROUP***";
+    sleep 3;
+    usermod -a -G sudo,ftp,www-data $SYSTEM_USER_NAME;
+
+    good_print "Step 19 [Add user in additional group].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
+}
+
+install_zabbix(){
+    good_print "***INSATALL ZABBIX***";
+    sleep 3;
+    cd /tmp;
+    wget https://repo.zabbix.com/zabbix/6.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.0-4+ubuntu22.04_all.deb;
+    dpkg -i zabbix-release_6.0-4+ubuntu22.04_all.deb;
+    apt update;
+    apt -y install zabbix-server-mysql zabbix-frontend-php zabbix-nginx-conf zabbix-sql-scripts zabbix-agent;
+
+    echo "create database zabbix character set utf8mb4 collate utf8mb4_bin;" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+    echo "create user zabbix@localhost identified by '${ZABBIX_PASSWORD}';" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+    echo "grant all privileges on zabbix.* to zabbix@localhost;" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+    echo "set global log_bin_trust_function_creators = 1;" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+
+    zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uzabbix -p zabbix;
+
+    echo "set global log_bin_trust_function_creators = 0;" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
+    
+    sed -i 's/# DBPassword=/DBPassword=${ZABBIX_PASSWORD}/g' /etc/zabbix/zabbix_server.conf;
+
+    sed -i 's/#        listen          8080;/        listen 80;/g' /etc/zabbix/nginx.conf;
+    sed -i 's/#        server_name     example.com;/         server_name zabbix.\${MAIN_DOMAIN};/g' /etc/zabbix/nginx.conf;
+
+    systemctl restart zabbix-server zabbix-agent nginx php8.1-fpm;
+    systemctl enable zabbix-server zabbix-agent nginx php8.1-fpm;
+    systemctl restart nginx;
+
+    good_print "Step 20 [Install zabbix].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
@@ -611,23 +699,56 @@ install_ssl(){
     snap install --classic certbot;
     certbot --nginx;
 
-    good_print "Step 17 [Install ssl].\nStatus: normal.\n";
+    good_print "Step 21 [Install ssl].\nStatus: normal.\n";
     sleep 5;
     return 0;
 }
 
-install_vsftpd(){
-    good_print "***INSTALL VSFTPD***";
+create_backup_script(){
+    good_print "***CREATE BACKUP SCRIPT***";
     sleep 3;
-    apt -y install vsftpd;
-    cp /etc/vsftpd.conf /etc/vsftpd.conf.backup;
+    touch /usr/local/bin/backup_cron2;
+    chmod 775 /usr/local/bin/backup_cron2;
+    cat << EOF > "/usr/local/bin/backup_cron2"
+#!/bin/bash
 
+### BAKCUP SITES  ###
+DATE=\$(date +%Y-%m-%d_%H:%M:%S);
+BACKUP_DIR="/tmp/site-backup/\${DATE}";
+mkdir -p \$BACKUP_DIR;
+zip -r \$BACKUP_DIR/scriptcraft.zip /var/www/scriptcraft.space;
+zip -r \$BACKUP_DIR/dev.scriptcraft.zip /var/www/dev.scriptcraft.space;
+zip -r \$BACKUP_DIR/stg.scriptcraft.zip /var/www/stg.scriptcraft.space;
+zip -r /tmp/all.backup.sites.\$DATE.zip /tmp/site-backup/\${DATE};
+scp /tmp/all.backup.sites.\$DATE.zip root@46.101.99.134:/root/backup/www;
+rm -rf /tmp/all.backup.sites.\$DATE.zip; 
+
+### BACKUP DB ###
+BACKUP_DIR="/tmp/db-backup/\${DATE}";
+mkdir -p \$BACKUP_DIR;
+mysqldump --single-transaction -u adminer -h localhost -p${MYSQL_ADMIN_PASSWORD} scriptcraft_space > \$BACKUP_DIR/scriptcraft_space.sql;
+mysqldump --single-transaction -u adminer -h localhost -p${MYSQL_ADMIN_PASSWORD} dev_scriptcraft_space > \$BACKUP_DIR/dev_scriptcraft_space.sql;
+mysqldump --single-transaction -u adminer -h localhost -p${MYSQL_ADMIN_PASSWORD} stg_scriptcraft_space > \$BACKUP_DIR/stg_scriptcraft_space.sql;
+mysqldump --single-transaction -u adminer -h localhost -p${MYSQL_ADMIN_PASSWORD} zabbix > \$BACKUP_DIR/zabbix.sql;
+zip -r /tmp/all.backup.db.\$DATE.zip /tmp/db-backup/\${DATE};
+scp /tmp/all.backup.db.\$DATE.zip root@46.101.99.134:/root/backup/www;
+rm -rf /tmp/all.backup.db.\$DATE.zip;
+EOF
+
+    cat << EOF >> "/etc/crontab"
+55 * * * * root /usr/local/bin/backup_cron
+EOF
+
+    good_print "Step 22 [Create backup script].\nStatus: normal.\n";
+    sleep 5;
+    return 0;
 }
 
 #**
 #*RUN
 #**
 zero_step;
+create_user;
 install_nginx;
 configuration_ufw;
 nginx_health_check;
@@ -644,7 +765,11 @@ install_wordpress_for_main_domain;
 install_wordpress_for_sub_domain;
 delete_unnecessary;
 basic_protection;
+install_vsftpd;
+add_user_in_additional_group;
+install_zabbix;
 install_ssl;
+create_backup_script;
 
 cat << EOF
 ************
