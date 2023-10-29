@@ -1,0 +1,6 @@
+#!/bin/bash
+evince '/home/vitaliy/knowledge_base/PHP/PHP8в подлиннике.pdf' & 
+evince '/home/vitaliy/knowledge_base/OS-Linux/Библия Linux. 10-е изд.Rescuer.pdf' & 
+yandex-browser & 
+code &
+notepadqq

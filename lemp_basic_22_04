@@ -2,6 +2,7 @@
 
 #**
 #*Signature
+# Ubuntu 22.04 LTS, Nginx, Wordpress, SSL, PHP - 8.1, Mysql - 8, Phpmyadmin, Zabbix - 6 LTS, Vsftpd, Backuc custom script
 #*installing https://www.digitalocean.com/community/tutorials/how-to-install-linux-nginx-mysql-php-lemp-stack-on-ubuntu-22-04
 #*Redirect https://eternalhost.net/base/vps-vds/nginx-redirekt
 #*Phpmyadmin https://losst.pro/ustanovka-phpmyadmin-s-nginx-v-ubuntu-20-04 OR 
@@ -15,29 +16,29 @@
 #**
 #system user
 SYSTEM_USER_NAME="adminer";
-SYSTEM_USER_PASSWORD="lalaland";
+SYSTEM_USER_PASSWORD="rokit555";
 
 #server
-MAIN_DOMAIN="scriptcraft.space";
+MAIN_DOMAIN="scriptcraft.site";
 SUBDOMAINS=(
-    "dev.scriptcraft.space" 
-    "stg.scriptcraft.space"
+    "dev.scriptcraft.site" 
+    "stg.scriptcraft.site"
     );
 
 #mysql    
 MYSQL_ROOT_PASSWORD="root555";
 MYSQL_ADMIN_USER="adminer";
-MYSQL_ADMIN_PASSWORD="lalaland";
+MYSQL_ADMIN_PASSWORD="rokit555";
 
 #phpmyadmin
 PMA_ADMIN_USER="adminer";
-PMA_AUTH_PASS="lalaland";
+PMA_AUTH_PASS="rokit555";
 PMA_HIDDEN_URI=$(head -c 100 /dev/urandom | base64 | sed 's/[+=/A-Z]//g' | tail -c 9);
 
 #wordpress
 WP_SITE_TITLE="TEST";
 WP_ADMIN_USER="adminer";
-WP_ADMIN_PASSWORD="lalaland";
+WP_ADMIN_PASSWORD="rokit555";
 WP_ADMIN_EMAIL="scriptcraft.site@gmail.com";
 WP_DB_PREFIX="wp_";
 WP_SITE_DESCRIPTION="My tets site";
@@ -45,21 +46,21 @@ WP_PERMALINK_STRUCTURE="/%postname%/";
 WP_THEME_NAME="twentytwentyone";
 
 #zabbix
-ZABBIX_PASSWORD="lalaland";
+ZABBIX_PASSWORD="rokit555";
 
 
 #other
 SWD=${0%/*};
-INSTALL_SSL="yes";
+INSTALL_SSL="NO";
 IP=$(wget -qO- ifconfig.me);
-
+ADMIN_EMAIL="scriptcraft.site@gmail.com";
 
 #**
 #*Start check
 #**
 if [[ $(id -u) -ne 0 ]];
 then
-    echo -e "\n You are not adminer. \n Run the command sudo -i (or sudo bash $0). \n Enter you password for current user. \n And start this script again.\n $0\n";
+    echo -e "\n You are not root. \n Run the command sudo -i. \n Enter you password for current user. \n And start this script again.\n $0\n";
     exit 1;
 fi
 
@@ -127,45 +128,45 @@ get_approval(){
 #**
 #*Functions actions
 #**
-zero_step(){
-    good_print "***ZERO STEP***";
-    sleep 3;
+preparatory_step(){
+    good_print "***PREPARATORY STEP***";
+    sleep 1;
     sed -i "/#\$nrconf{restart} = 'i';/s/.*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf;
     apt-get -y update;
-    apt-get -y upgrade;
-    apt-get -y install -y vim mosh tmux htop git curl wget unzip zip gcc build-essential make;
-    good_print "Step 0 [Zero step].\nStatus: normal.\n";
-    sleep 5;
+    apt-get -y upgrade; 
+    apt-get -y install -y vim tmux htop git curl wget unzip zip gcc build-essential make;
+    good_print "Step 0 [Preparatory step].\nStatus: normal.\n";
+    sleep 1;
     return 0;
 }
 
 create_user(){
     good_print "***CREATE USER***";
-    sleep 3;
+    sleep 1;
     useradd -s /bin/bash -d /home/$SYSTEM_USER_NAME -m $SYSTEM_USER_NAME;
     echo -e "${SYSTEM_USER_PASSWORD}\n${SYSTEM_USER_PASSWORD}\n" | passwd $SYSTEM_USER_NAME;
     good_print "Step 1 [Create user].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 install_nginx(){
     good_print "***INSTALL NGINX***";
-    sleep 3;
-    apt -y install nginx;
+    sleep 1;
+    apt-get -y install nginx;
     if [[ 0 != $? ]]; then
         bad_print "install nginx failed";
         return 1;
     fi
     systemctl enable nginx;
     good_print "Step 2 [Install nginx].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 configuration_ufw(){
     good_print "***CONFIGURATION UFW***";
-    sleep 3;
+    sleep 1;
     ufw allow 'Nginx HTTP';
     if [[ "yes" == $INSTALL_SSL ]]; then 
         ufw allow 'Nginx HTTPS';
@@ -182,30 +183,30 @@ configuration_ufw(){
     fi
     ufw status;
     good_print "Step 3 [Configuration UFW].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 nginx_health_check(){
     good_print "***NGINX HEALTTH CHEACK***";
-    sleep 3;
+    sleep 1;
     good_print "At this stage you can check the Apache. Make a request from the browser or through curl http://ip_addr:port or http://$MAIN_DOMAIN:port You should see the start page and the Apache server.";
     get_approval;
     good_print "Step 4 [Nginx health check].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 install_mysql(){
     good_print "***INSTALL MYSQL***";
-    sleep 3;
+    sleep 1;
     apt -y install mysql-server;
     if [[ 0 != $? ]]; then
         bad_print "install mysql failed";
         return 1;
     fi
 
-    echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASSWORD}';" | mysql
+    echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASSWORD}';" | mysql;
 
     good_print "We’re about to launch a security breach.";
     good_print "1. Enter the password you set for the root user in the previous step.";
@@ -217,20 +218,22 @@ install_mysql(){
     good_print "7. It is recommended to reset all starting privileges. That is the answer - Y";
 
     get_approval;
-    mysql_secure_installation;
+    mysql_secure_installation -uroot -p${MYSQL_ROOT_PASSWORD};
 
     echo "CREATE USER '${MYSQL_ADMIN_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ADMIN_PASSWORD}';" | mysql -u root -p${MYSQL_ROOT_PASSWORD};
     echo "GRANT ALL PRIVILEGES ON *.* TO '${MYSQL_ADMIN_USER}'@'localhost' WITH GRANT OPTION;" | mysql -u root -p${MYSQL_ROOT_PASSWORD};
     
     good_print "Step 5 [install Mysql].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 install_php(){
     good_print "***INSTALL PHP***";
-    sleep 3;
-    apt -y install php-fpm php-mysql;
+    sleep 1;
+    add-apt-repository ppa:ondrej/php -y;
+    apt update;
+    apt-get -y install php-fpm php-mysql;
     if [[ 0 != $? ]]; then
         bad_print "install php libapache2-mod-php php-mysql failed";
         return 1;
@@ -242,13 +245,13 @@ install_php(){
         return 1;
     fi
     good_print "Step 6 [install PHP].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 create_main_domain(){
     good_print "***CREATE MAIN DOMAIN***";
-    sleep 3;
+    sleep 1;
 
     files=$(ls /var/run/php/);
     for file in $files; do
@@ -304,12 +307,12 @@ EOF
     unlink /etc/nginx/sites-enabled/default;
     systemctl reload nginx;
     nginx -t;
-    sleep 3;
+    sleep 1;
 
     sed -i 's/include \/etc\/nginx\/sites-enabled\/\*/include \/etc\/nginx\/sites-enabled\/*.conf/' /etc/nginx/nginx.conf;  
     systemctl reload nginx;
     good_print "Step 7 [Create main domain].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
@@ -319,7 +322,7 @@ create_sub_domain(){
     else
         if [[ 0 < ${#SUBDOMAINS[@]} ]]; then 
             good_print "***CREATE SUB DOMAIN***";
-            sleep 3;
+            sleep 1;
         else
             return 1;    
         fi    
@@ -362,15 +365,15 @@ EOF
 
     systemctl reload nginx;
     nginx -t;
-    sleep 3;
+    sleep 1;
     good_print "Step 8 [Create sub domain].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 test_php(){
     good_print "***TEST PHP***";
-    sleep 3;
+    sleep 1;
     touch "/var/www/$MAIN_DOMAIN/info.php";
     cat << EOF > "/var/www/$MAIN_DOMAIN/info.php"
 <?php
@@ -380,13 +383,13 @@ EOF
     get_approval;
     rm "/var/www/$MAIN_DOMAIN/info.php";
     good_print "Step 9 [Test PHP].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 test_php_and_mysql(){
     good_print "***TEST PHP AND MYSQL***";
-    sleep 3;
+    sleep 1;
 
     echo "CREATE DATABASE example_database;" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
     echo "CREATE TABLE example_database.todo_list (item_id INT AUTO_INCREMENT,content VARCHAR(255),PRIMARY KEY(item_id));" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
@@ -415,14 +418,14 @@ test_php_and_mysql(){
     get_approval;
     rm "/var/www/$MAIN_DOMAIN/todo_list.php";
     good_print "Step 10 [Test PHP and MySQL].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 
 }
 
 close_request_on_ip(){
     good_print "***REDIRECT FROM IP TO MAIN DOMAIN***";
-    sleep 3;
+    sleep 1;
     touch "/etc/nginx/sites-available/def.conf";
     cat << EOF > "/etc/nginx/sites-available/def.conf"                                         
 server {
@@ -434,13 +437,13 @@ EOF
     ln -s /etc/nginx/sites-available/def.conf /etc/nginx/sites-enabled/def.conf;
     systemctl restart nginx;
     good_print "Step 11 [Redirect from ip to main domain].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 install_phpmyadmin(){
     good_print "***INSTALL PHPMYADMIN***";
-    sleep 3;
+    sleep 1;
 
     good_print "The installation of phpmyadmin will now be started";
     good_print "During the installation process, you will need to answer a few questions.";
@@ -456,24 +459,24 @@ install_phpmyadmin(){
 
     systemctl reload nginx;
     good_print "Step 12 [Install_phpmyadmin].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 install_wordpress_cli(){
     good_print "***INSTALL WORDPRESS CLI***";
-    sleep 3;
+    sleep 1;
     curl -L https://raw.github.com/wp-cli/builds/gh-pages/phar/wp-cli.phar > /tmp/wp-cli.phar;
     chmod +x /tmp/wp-cli.phar;
     mv /tmp/wp-cli.phar /usr/bin/wp;
     good_print "Step 13 [Install wordpress cli].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 install_wordpress_for_main_domain(){
     good_print "***INSTALL WORDPRESS FOR MAIN DOMAIN***";
-    sleep 3;
+    sleep 1;
     
     cd /var/www/$MAIN_DOMAIN/;
     wp core download --force --allow-root;
@@ -506,7 +509,7 @@ install_wordpress_for_main_domain(){
     chown -R "${SYSTEM_USER_NAME}:www-data" "/var/www/";
     chmod -R "g+w" "/var/www/";
     good_print "Step 14 [Install wordpress for main domain].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
@@ -516,7 +519,7 @@ install_wordpress_for_sub_domain(){
     else
         if [[ 0 < ${#SUBDOMAINS[@]} ]]; then 
             good_print "***INSTALL WORDPRESS FOR SUB DOMAIN***";
-            sleep 3;
+            sleep 1;
         else
             return 1;    
         fi    
@@ -556,24 +559,23 @@ install_wordpress_for_sub_domain(){
         chmod -R "g+w" "/var/www/";
     done
     good_print "Step 15 [Install wordpress for sub domain].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
-    #https://www.youtube.com/watch?v=VF3VvP9v0Y8
 }
 
 delete_unnecessary(){
     good_print "***DELETE UNNECESSARY***";
-    sleep 3;
+    sleep 1;
     rm -rf "/var/www/html";
     echo "DROP DATABASE IF EXISTS example_database;" | mysql -u ${MYSQL_ADMIN_USER} -p${MYSQL_ADMIN_PASSWORD};
     good_print "Step 16 [Delete unnecessary].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 basic_protection(){
     good_print "***BASIC PROTECTION***";
-    sleep 3;
+    sleep 1;
     
     #скрытый адрес для phpmyadmin и браузерная аутентификация 
     mv /var/www/${MAIN_DOMAIN}/phpmyadmin /var/www/${MAIN_DOMAIN}/${PMA_HIDDEN_URI};
@@ -608,13 +610,13 @@ EOF
     systemctl restart nginx;
 
     good_print "Step 17 [Basic protection].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 install_vsftpd(){
     good_print "***INSTALL VSFTPD***";
-    sleep 3;
+    sleep 1;
     apt -y install vsftpd;
     systemctl enable vsftpd;
     cp /etc/vsftpd.conf /etc/vsftpd.conf.backup;
@@ -639,23 +641,23 @@ EOF
     systemctl restart vsftpd;
 
     good_print "Step 18 [Install vsftpd].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 add_user_in_additional_group(){
     good_print "***ADD USER IN ADDITIONAL GROUP***";
-    sleep 3;
+    sleep 1;
     usermod -a -G sudo,ftp,www-data $SYSTEM_USER_NAME;
 
     good_print "Step 19 [Add user in additional group].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 install_zabbix(){
     good_print "***INSATALL ZABBIX***";
-    sleep 3;
+    sleep 1;
     cd /tmp;
     wget https://repo.zabbix.com/zabbix/6.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.0-4+ubuntu22.04_all.deb;
     dpkg -i zabbix-release_6.0-4+ubuntu22.04_all.deb;
@@ -674,22 +676,20 @@ install_zabbix(){
     sed -i 's/# DBPassword=/DBPassword=${ZABBIX_PASSWORD}/g' /etc/zabbix/zabbix_server.conf;
 
     sed -i 's/#        listen          8080;/        listen 80;/g' /etc/zabbix/nginx.conf;
-    sed -i 's/#        server_name     example.com;/         server_name zabbix.\${MAIN_DOMAIN};/g' /etc/zabbix/nginx.conf;
+    sed -i 's/#        server_name     example.com;/         server_name zabbix.${MAIN_DOMAIN};/g' /etc/zabbix/nginx.conf;
 
     systemctl restart zabbix-server zabbix-agent nginx php8.1-fpm;
     systemctl enable zabbix-server zabbix-agent nginx php8.1-fpm;
     systemctl restart nginx;
 
     good_print "Step 20 [Install zabbix].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 install_ssl(){
-    #https://losst.pro/ustanovka-ssl-sertifikata-apache-ot-lets-encrypt
-    #https://help.ubuntu.ru/wiki/apache_%D0%B8_https
     good_print "***INSTALL SSL***";
-    sleep 3;
+    sleep 1;
     if [[ "yes" != $INSTALL_SSL ]]; then
         echo "SSL will not be install";
         return 0;
@@ -700,16 +700,16 @@ install_ssl(){
     certbot --nginx;
 
     good_print "Step 21 [Install ssl].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 create_backup_script(){
     good_print "***CREATE BACKUP SCRIPT***";
-    sleep 3;
-    touch /usr/local/bin/backup_cron2;
-    chmod 775 /usr/local/bin/backup_cron2;
-    cat << EOF > "/usr/local/bin/backup_cron2"
+    sleep 1;
+    touch /usr/local/bin/backup_cron;
+    chmod 775 /usr/local/bin/backup_cron;
+    cat << EOF > "/usr/local/bin/backup_cron"
 #!/bin/bash
 
 ### BAKCUP SITES  ###
@@ -740,14 +740,14 @@ EOF
 EOF
 
     good_print "Step 22 [Create backup script].\nStatus: normal.\n";
-    sleep 5;
+    sleep 1;
     return 0;
 }
 
 #**
 #*RUN
 #**
-zero_step;
+preparatory_step;
 create_user;
 install_nginx;
 configuration_ufw;
@@ -767,9 +767,9 @@ delete_unnecessary;
 basic_protection;
 install_vsftpd;
 add_user_in_additional_group;
-install_zabbix;
-install_ssl;
-create_backup_script;
+# install_zabbix;
+# install_ssl;
+# create_backup_script;
 
 cat << EOF
 ************

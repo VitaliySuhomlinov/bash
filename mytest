@@ -1,50 +1,8 @@
 #!/bin/bash
-### System Setup ###
-BACKUP=/tmp/site-backup
+echo $SUDO_USER;
 
-### FTP ###
-FTPD="/"
-FTPU="yourname_ftpuser"
-FTPP="yourpass"
-FTPS="ip_ftp_server"
+sudo -i;
+ 
+echo $(whoami);
 
-### Binaries ###
-TAR="$(which tar)"
-GZIP="$(which gzip)"
-FTP="$(which ncftp)"
-
-## Today + hour in 24h format ###
-DATE=$(date +%Y-%m-%d)
-
-### Create tmp dir ###
-mkdir -p $BACKUP/$DATE
-TMPDIR="$BACKUP/$NOW"
-$TAR -cf $BACKUP/$NOW/archivename.tar /path/to/www.my.site.net
-$TAR -cf $BACKUP/$NOW/archivename1.tar /path/to/www.example.com
-
-### Организовываем шифрованные архивы :)) ###
-
-#   $TAR -cf - /path/to/www.my.site.net \
-#   | openssl enc -e -aes-256-cbc -k "password" > $BACKUP/$NOW/www.my.site.net.tar.encoded
-#   $TAR -cf - /path/to/www.example.com \
-#   | openssl enc -e -aes-256-cbc -k "password" > $BACKUP/$NOW/www.example.com.tar.encoded
-
-## for decoded
-#   openssl enc -d -aes-256-cbc -in [filename.encoded] | tar xf -
-#   pass: [pass]
-
-###
-
-### ftp server ###
-cd $TMPDIR
-DUMPFOLDER=allsites-$NOW
-$FTP -u $FTPU -p $FTPP $FTPS <<END_SCRIPT
-mkdir $DUMPFOLDER
-cd $DUMPFOLDER
-mput -R *
-quit
-END_SCRIPT
-
-### clear ###
-cd /tmp
-rm -rf $TMPDIR
+sudo su vitaliy;
